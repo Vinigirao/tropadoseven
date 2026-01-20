@@ -81,7 +81,10 @@ export default function DashboardPage() {
       grouped[h.player_id].push(h);
     });
     const datasets = selectedPlayers.map((pid) => {
+      // Find the player name for the legend label
       const player = rows.find((r) => r.player_id === pid);
+      // Use the index of each history entry (i) as the X value so that
+      // the horizontal axis represents the sequence of matches (1,2,3…).
       const data = (grouped[pid] || []).map((h, i) => ({ x: i + 1, y: h.rating_after }));
       return {
         label: player?.name || pid,
@@ -91,17 +94,42 @@ export default function DashboardPage() {
     chartRef.current = new Chart(canvas, {
       type: "line",
       data: {
+        // We rely on the x value of each datum for chart positioning. Leaving labels empty
         labels: [],
         datasets,
       },
       options: {
         responsive: true,
         plugins: {
-          legend: { labels: { color: "#e9eefc" } },
+          legend: {
+            labels: { color: "#e9eefc" },
+          },
         },
         scales: {
-          x: { ticks: { color: "#93a4c7" } },
-          y: { ticks: { color: "#93a4c7" } },
+          x: {
+            // Represent the X axis as match number (1, 2, 3...).
+            type: "linear",
+            title: {
+              display: true,
+              text: "Partida",
+              color: "#e9eefc",
+            },
+            ticks: {
+              color: "#93a4c7",
+              // Use no decimals for match numbers
+              precision: 0,
+            },
+          },
+          y: {
+            title: {
+              display: true,
+              text: "Rating",
+              color: "#e9eefc",
+            },
+            ticks: {
+              color: "#93a4c7",
+            },
+          },
         },
       },
     });
