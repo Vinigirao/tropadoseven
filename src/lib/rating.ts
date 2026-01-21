@@ -1,6 +1,6 @@
 /**
- * Compute expected score for player A against player B using Elo formula.
- */
+     * Compute expected score for player A against player B using Elo formula.
+     */
 export function expectedScore(ra: number, rb: number) {
   return 1 / (1 + Math.pow(10, (rb - ra) / 400));
 }
@@ -27,16 +27,23 @@ export function computeMatchDeltas(
   cfg: { kFactor: number; kPerf: number; scale: number },
 ) {
   // Average points across all players
-  const avg = playerIds.reduce((sum, id) => sum + pointsById[id], 0) / playerIds.length;
+  const avg =
+    playerIds.reduce((sum, id) => sum + pointsById[id], 0) /
+    playerIds.length;
   // Initialise deltas
   const deltas: Record<string, number> = {};
-  playerIds.forEach(id => (deltas[id] = 0));
+  playerIds.forEach((id) => (deltas[id] = 0));
   // Pairwise Elo calculation
   for (let i = 0; i < playerIds.length; i++) {
     for (let j = i + 1; j < playerIds.length; j++) {
       const a = playerIds[i];
       const b = playerIds[j];
-      const sa = pointsById[a] > pointsById[b] ? 1 : pointsById[a] < pointsById[b] ? 0 : 0.5;
+      const sa =
+        pointsById[a] > pointsById[b]
+          ? 1
+          : pointsById[a] < pointsById[b]
+          ? 0
+          : 0.5;
       const ea = expectedScore(ratingById[a], ratingById[b]);
       const d = cfg.kFactor * (sa - ea);
       deltas[a] += d;
@@ -44,7 +51,7 @@ export function computeMatchDeltas(
     }
   }
   // Adjust by performance vs average
-  playerIds.forEach(id => {
+  playerIds.forEach((id) => {
     deltas[id] += cfg.kPerf * tanh((pointsById[id] - avg) / cfg.scale);
   });
   return deltas;

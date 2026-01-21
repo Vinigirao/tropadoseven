@@ -14,10 +14,12 @@ type DashRow = {
   delta_last_10: number;
 };
 
+// Each history row includes the global match order index so the X axis
+// can represent the sequence of matches rather than the index per player.
 type HistoryRow = {
   player_id: string;
   rating_after: number;
-  created_at: string;
+  match_index: number;
 };
 
 // Initialise a client-side Supabase client using the anon key. Only
@@ -45,17 +47,18 @@ export default function DashboardPage() {
     }
   }
 
-  // Load rating history for selected players
+  // Load rating history for selected players. Use the view with match order
+  // so that the X axis is consistent across players.
   async function loadHistory(playerIds: string[]) {
     if (playerIds.length === 0) {
       setHistory([]);
       return;
     }
     const { data } = await supabase
-      .from("rating_history")
-      .select("player_id, rating_after, created_at")
+      .from("v_rating_history_with_order")
+      .select("player_id, rating_after, match_index")
       .in("player_id", playerIds)
-      .order("created_at", { ascending: true });
+      .order("match_index", { ascending: true });
     setHistory((data as HistoryRow[]) || []);
   }
 
@@ -83,9 +86,8 @@ export default function DashboardPage() {
     const datasets = selectedPlayers.map((pid) => {
       // Find the player name for the legend label
       const player = rows.find((r) => r.player_id === pid);
-      // Use the index of each history entry (i) as the X value so that
-      // the horizontal axis represents the sequence of matches (1,2,3…).
-      const data = (grouped[pid] || []).map((h, i) => ({ x: i + 1, y: h.rating_after }));
+      // Use the match_index as the X value so that the horizontal axis represents the global sequence of matches.
+      const data = (grouped[pid] || []).map((h) => ({ x: h.match_index, y: h.rating_after }));
       return {
         label: player?.name || pid,
         data,
@@ -94,7 +96,6 @@ export default function DashboardPage() {
     chartRef.current = new Chart(canvas, {
       type: "line",
       data: {
-        // We rely on the x value of each datum for chart positioning. Leaving labels empty
         labels: [],
         datasets,
       },
@@ -107,16 +108,14 @@ export default function DashboardPage() {
         },
         scales: {
           x: {
-            // Represent the X axis as match number (1, 2, 3...).
             type: "linear",
             title: {
               display: true,
-              text: "Partida",
+              text: "Ordem da Partida",
               color: "#e9eefc",
             },
             ticks: {
               color: "#93a4c7",
-              // Use no decimals for match numbers
               precision: 0,
             },
           },
@@ -179,12 +178,10 @@ export default function DashboardPage() {
                   <td className="right">
                     <b>{Math.round(r.rating)}</b>
                   </td>
-                    <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
+                  <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
                   <td className="right">{Number(r.avg_points).toFixed(1)}</td>
                   <td className="right">{r.games}</td>
-                  <td className="right">
-                    {Number(r.delta_last_10).toFixed(1)}
-                  </td>
+                  <td className="right">{Number(r.delta_last_10).toFixed(1)}</td>
                 </tr>
               ))}
             </tbody>
@@ -200,7 +197,7 @@ export default function DashboardPage() {
             value={selectedPlayers}
             onChange={(e) =>
               setSelectedPlayers(
-                Array.from(e.target.selectedOptions).map((o) => o.value)
+                Array.from(e.target.selectedOptions).map((o) => o.value),
               )
             }
             style={{ width: "100%", height: 140 }}

@@ -5,7 +5,9 @@ import { createClient } from "@supabase/supabase-js";
 
 type Player = { id: string; name: string };
 
-// Client‑side Supabase client for admin actions
+// Initialise a client‑side Supabase client for admin actions.  Only
+// client‑accessible environment variables (prefixed with
+// NEXT_PUBLIC_) are exposed at build time.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -23,12 +25,11 @@ export default function AdminPage() {
   );
   const [selected, setSelected] = useState<string[]>([]);
   const [points, setPoints] = useState<Record<string, string>>({});
-
   // List of existing matches for editing
   const [matches, setMatches] = useState<any[]>([]);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
 
-  // Load players on mount
+  // Load players from the database
   async function loadPlayers() {
     const { data } = await supabase.from("players").select("id,name").order("name");
     setPlayers((data as Player[]) || []);
@@ -38,14 +39,14 @@ export default function AdminPage() {
     loadPlayers();
   }, []);
 
-  // When logged state changes to true, load matches
+  // When the admin logs in, load existing matches
   useEffect(() => {
     if (logged) {
       loadMatches();
     }
   }, [logged]);
 
-  // Fetch matches with their entries for editing
+  // Fetch all matches via the admin API
   async function loadMatches() {
     const res = await fetch("/api/admin/list-matches");
     if (res.ok) {
@@ -54,7 +55,9 @@ export default function AdminPage() {
     }
   }
 
-  // Login handler sets session via API route
+  // Attempt an admin login by posting to the login API.  On success
+  // it sets the `logged` state, reloads players and matches and shows
+  // a success message.  On failure it shows an error message.
   async function login() {
     setMsg("");
     const res = await fetch("/api/login", {
@@ -65,7 +68,6 @@ export default function AdminPage() {
     if (res.ok) {
       setLogged(true);
       setMsg("Autenticado");
-      // reload data on login
       loadPlayers();
       loadMatches();
     } else {
@@ -73,7 +75,7 @@ export default function AdminPage() {
     }
   }
 
-  // Add a new player via admin API
+  // Create a new player
   async function addPlayer() {
     setMsg("");
     const res = await fetch("/api/admin/add-player", {
@@ -91,7 +93,7 @@ export default function AdminPage() {
     }
   }
 
-  // Save a match with selected players and their points
+  // Register a new match
   async function addMatch() {
     setMsg("");
     const entries = selected.map((id) => ({
@@ -114,7 +116,7 @@ export default function AdminPage() {
     }
   }
 
-  // Update an existing match (editing)
+  // Update an existing match
   async function updateMatch() {
     if (!editingMatchId) return;
     setMsg("");
@@ -131,7 +133,6 @@ export default function AdminPage() {
       setEditingMatchId(null);
       setSelected([]);
       setPoints({});
-      // Reset match date to today for new entries
       setMatchDate(new Date().toISOString().slice(0, 10));
       setMsg("Partida atualizada");
       loadMatches();
@@ -141,7 +142,7 @@ export default function AdminPage() {
     }
   }
 
-  // Begin editing a selected match
+  // Prefill the form when editing a match
   function editMatch(match: any) {
     setEditingMatchId(match.id.toString());
     setMatchDate(match.match_date);
@@ -155,7 +156,7 @@ export default function AdminPage() {
     setMsg("");
   }
 
-  // Cancel editing and clear form
+  // Cancel editing and reset the form
   function cancelEdit() {
     setEditingMatchId(null);
     setSelected([]);
@@ -169,9 +170,7 @@ export default function AdminPage() {
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <h2 style={{ margin: 0 }}>Admin</h2>
-          <div className="muted">
-            Protegido por login/senha (cookies de sessão)
-          </div>
+          <div className="muted">Protegido por login/senha (cookies de sessão)</div>
         </div>
         <a href="/" className="muted">
           Dashboard
@@ -228,9 +227,7 @@ export default function AdminPage() {
               multiple
               value={selected}
               onChange={(e) =>
-                setSelected(
-                  Array.from(e.target.selectedOptions).map((o) => o.value),
-                )
+                setSelected(Array.from(e.target.selectedOptions).map((o) => o.value))
               }
               style={{ width: "100%", height: 180, marginTop: 8 }}
             >
@@ -241,9 +238,7 @@ export default function AdminPage() {
               ))}
             </select>
             <div style={{ marginTop: 12 }}>
-              {selected.length === 0 && (
-                <div className="muted">Nenhum jogador selecionado</div>
-              )}
+              {selected.length === 0 && <div className="muted">Nenhum jogador selecionado</div>}
               {selected.map((id) => {
                 const player = players.find((p) => p.id === id);
                 return (
@@ -268,11 +263,7 @@ export default function AdminPage() {
               {editingMatchId ? "Atualizar partida" : "Salvar partida"}
             </button>
             {editingMatchId && (
-              <button
-                className="secondary"
-                onClick={cancelEdit}
-                style={{ marginLeft: 8 }}
-              >
+              <button className="secondary" onClick={cancelEdit} style={{ marginLeft: 8 }}>
                 Cancelar edição
               </button>
             )}
@@ -281,9 +272,7 @@ export default function AdminPage() {
 
           <div className="card">
             <h3 style={{ marginTop: 0 }}>Partidas existentes</h3>
-            {matches.length === 0 && (
-              <div className="muted">Nenhuma partida cadastrada</div>
-            )}
+            {matches.length === 0 && <div className="muted">Nenhuma partida cadastrada</div>}
             {matches.map((match) => (
               <div key={match.id} style={{ marginBottom: 8 }}>
                 <div className="row" style={{ alignItems: "center" }}>

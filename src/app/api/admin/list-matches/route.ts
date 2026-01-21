@@ -3,18 +3,18 @@ import { isAdminAuthenticated } from "../../../../lib/auth";
 import { supabaseServer } from "../../../../lib/supabaseServer";
 
 /**
- * GET /api/admin/list-matches
- *
- * Returns a list of all matches with their entries and player names.  This
- * endpoint is restricted to authenticated admins.
+ * List all matches with their entries and player names.  This
+ * endpoint is restricted to authenticated admins.  Matches are
+ * returned in descending order of match_date and created_at so that
+ * recent matches appear first.  Each match includes an array of
+ * `match_entries` where each entry contains the player_id, points
+ * scored, and the associated player's name.
  */
 export async function GET() {
-  // Only allow calls if the current session is an authenticated admin.
   if (!isAdminAuthenticated()) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const sb = supabaseServer();
-  // Select matches and join players via match_entries.players
   const { data: matches, error } = await sb
     .from("matches")
     .select(
