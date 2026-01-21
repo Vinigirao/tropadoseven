@@ -57,6 +57,12 @@ button.primary {
   border-color: #4ea1ff;
 }
 
+/* Secondary button style used on the admin page for cancelling edits. */
+button.secondary {
+  background: #0d152a;
+  border-color: #233152;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
