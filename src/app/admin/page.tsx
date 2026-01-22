@@ -144,6 +144,18 @@ export default function AdminPage() {
 
   // Delete a match by ID
   async function deleteMatch(matchId: string) {
+    // Second layer of protection: require the user to type the word
+    // "excluir" to confirm the deletion.  Using a prompt here avoids
+    // adding extra UI components while still ensuring intentional
+    // actions.
+    const input = window.prompt(
+      'Digite "excluir" para confirmar a exclusão da partida',
+    );
+    if (input !== "excluir") {
+      // If the user cancels or types something else, abort the deletion
+      setMsg("Exclusão cancelada");
+      return;
+    }
     setMsg("");
     const res = await fetch("/api/admin/delete-match", {
       method: "POST",
