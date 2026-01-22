@@ -142,6 +142,24 @@ export default function AdminPage() {
     }
   }
 
+  // Delete a match by ID
+  async function deleteMatch(matchId: string) {
+    setMsg("");
+    const res = await fetch("/api/admin/delete-match", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ matchId }),
+    });
+    if (res.ok) {
+      setMsg("Partida deletada");
+      // Reload matches to reflect removal
+      loadMatches();
+    } else {
+      const j = await res.json();
+      setMsg(j.error || "Erro ao deletar partida");
+    }
+  }
+
   // Prefill the form when editing a match
   function editMatch(match: any) {
     setEditingMatchId(match.id.toString());
@@ -282,9 +300,21 @@ export default function AdminPage() {
                       {match.match_entries
                         .map((e: any) => `${e.players?.name || e.player_id}: ${e.points}`)
                         .join(" | ")}
+                      {"  "}
+                      {/* Show total points for the match */}
+                      <span style={{ fontStyle: "italic" }}>
+                        Total: {match.match_entries.reduce((sum: number, e: any) => sum + Number(e.points), 0)}
+                      </span>
                     </div>
                   </div>
                   <button onClick={() => editMatch(match)}>Editar</button>
+                  <button
+                    onClick={() => deleteMatch(match.id.toString())}
+                    className="secondary"
+                    style={{ marginLeft: 8 }}
+                  >
+                    Excluir
+                  </button>
                 </div>
               </div>
             ))}
