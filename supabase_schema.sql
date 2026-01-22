@@ -1,153 +1,154 @@
--- SQL schema for 7 Wonders rating system
--- Creates tables for players, matches, match entries, rating history
--- and views for current ratings and dashboard stats.
+-- Drop existing views to avoid dependency conflicts
+DROP VIEW IF EXISTS v_rating_history_with_order CASCADE;
+DROP VIEW IF EXISTS v_dashboard_players CASCADE;
+DROP VIEW IF EXISTS v_player_current_rating CASCADE;
 
-create table if not exists players (
-  id uuid primary key default gen_random_uuid(),
-  name text not null unique,
-  created_at timestamptz not null default now()
+-- Drop existing tables in the correct order (foreign-key constraints)
+DROP TABLE IF EXISTS rating_history CASCADE;
+DROP TABLE IF EXISTS match_entries CASCADE;
+DROP TABLE IF EXISTS matches CASCADE;
+DROP TABLE IF EXISTS players CASCADE;
+DROP TABLE IF EXISTS rating_params CASCADE;
+
+-- Recreate tables
+CREATE TABLE players (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-create table if not exists matches (
-  id uuid primary key default gen_random_uuid(),
-  match_date date not null,
-  created_at timestamptz not null default now()
+CREATE TABLE matches (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_date DATE NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-create table if not exists match_entries (
-  match_id uuid not null references matches(id) on delete cascade,
-  player_id uuid not null references players(id) on delete cascade,
-  points numeric not null,
-  primary key (match_id, player_id)
+CREATE TABLE match_entries (
+  match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  points NUMERIC NOT NULL,
+  PRIMARY KEY (match_id, player_id)
 );
 
--- Parameter table for Elo calculations. Allows admins to adjust kFactor, performance weight and scale.
-create table if not exists rating_params (
-  id integer primary key default 1,
-  k_factor numeric not null,
-  k_perf numeric not null,
-  scale numeric not null
+-- Parameter table for Elo calculations
+CREATE TABLE rating_params (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  k_factor NUMERIC NOT NULL,
+  k_perf NUMERIC NOT NULL,
+  scale NUMERIC NOT NULL
 );
 
--- Insert default parameters if not present.
-insert into rating_params (id, k_factor, k_perf, scale)
-values (1, 24, 10, 20)
-on conflict (id) do nothing;
+INSERT INTO rating_params (id, k_factor, k_perf, scale)
+VALUES (1, 24, 10, 20)
+ON CONFLICT (id) DO NOTHING;
 
-create table if not exists rating_history (
-  id uuid primary key default gen_random_uuid(),
-  match_id uuid not null references matches(id) on delete cascade,
-  player_id uuid not null references players(id) on delete cascade,
-  rating_after numeric not null,
-  delta numeric not null,
-  created_at timestamptz not null default now()
+CREATE TABLE rating_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+  player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+  rating_after NUMERIC NOT NULL,
+  delta NUMERIC NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Function: compute Elo rating history for all matches. This procedure recalculates
--- ratings and deltas for every match using the parameters in rating_params and
--- overwrites the rating_history table. It performs the same algorithm as the
--- original JavaScript implementation but runs entirely within the database.
-create or replace function compute_rating_history()
-returns void
-language plpgsql
-as $$
-declare
-  initial_rating numeric := 1000;
-  kFactor numeric;
-  kPerf numeric;
-  scale numeric;
-  rec_match record;
-  rating_by_id jsonb := '{}'::jsonb;
-  deltas jsonb;
-  rec_pair record;
-  rec_player record;
-  ra numeric;
-  rb numeric;
-  expected_a numeric;
-  score_a numeric;
-  delta numeric;
-  current_delta numeric;
-  perf_adj numeric;
-  new_rating numeric;
-  avg_points numeric;
-begin
-  -- Load parameters
-  select k_factor, k_perf, scale into kFactor, kPerf, scale from rating_params where id = 1;
-  -- Reset history
-  delete from rating_history;
-  -- Iterate through matches chronologically
-  for rec_match in
-    select id, match_date, created_at from matches order by match_date, created_at
-  loop
-    -- Reset deltas for this match
+-- Function to recompute ratings; ensure variable naming avoids ambiguous references
+CREATE OR REPLACE FUNCTION compute_rating_history()
+RETURNS VOID
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  initial_rating NUMERIC := 1000;
+  kFactor NUMERIC;
+  kPerf NUMERIC;
+  scale_param NUMERIC;
+  rec_match RECORD;
+  rating_by_id JSONB := '{}'::jsonb;
+  deltas JSONB;
+  rec_pair RECORD;
+  rec_player RECORD;
+  ra NUMERIC;
+  rb NUMERIC;
+  expected_a NUMERIC;
+  score_a NUMERIC;
+  delta NUMERIC;
+  current_delta NUMERIC;
+  perf_adj NUMERIC;
+  new_rating NUMERIC;
+  avg_points NUMERIC;
+BEGIN
+  SELECT k_factor, k_perf, scale INTO kFactor, kPerf, scale_param FROM rating_params WHERE id = 1;
+  DELETE FROM rating_history WHERE match_id IS NOT NULL;
+
+  FOR rec_match IN SELECT id, match_date, created_at FROM matches ORDER BY match_date, created_at LOOP
     deltas := '{}'::jsonb;
-    -- Initialise deltas and ratings for participating players
-    for rec_player in select player_id, points from match_entries where match_id = rec_match.id loop
-      if not rating_by_id ? rec_player.player_id::text then
+    FOR rec_player IN SELECT player_id, points FROM match_entries WHERE match_id = rec_match.id LOOP
+      IF NOT rating_by_id ? rec_player.player_id::text THEN
         rating_by_id := rating_by_id || jsonb_build_object(rec_player.player_id::text, initial_rating);
-      end if;
+      END IF;
       deltas := deltas || jsonb_build_object(rec_player.player_id::text, 0);
-    end loop;
-    -- Compute pairwise Elo deltas
-    for rec_pair in
-      select a.player_id as a_id, a.points as a_pts, b.player_id as b_id, b.points as b_pts
-      from match_entries a
-      join match_entries b on a.match_id = b.match_id and a.player_id < b.player_id
-      where a.match_id = rec_match.id
-    loop
-      ra := (rating_by_id ->> rec_pair.a_id::text)::numeric;
-      rb := (rating_by_id ->> rec_pair.b_id::text)::numeric;
-      expected_a := 1 / (1 + power(10, (rb - ra) / 400));
-      if rec_pair.a_pts > rec_pair.b_pts then
+    END LOOP;
+    FOR rec_pair IN
+      SELECT a.player_id AS a_id, a.points AS a_pts, b.player_id AS b_id, b.points AS b_pts
+      FROM match_entries a
+      JOIN match_entries b ON a.match_id = b.match_id AND a.player_id < b.player_id
+      WHERE a.match_id = rec_match.id
+    LOOP
+      ra := (rating_by_id ->> rec_pair.a_id::text)::NUMERIC;
+      rb := (rating_by_id ->> rec_pair.b_id::text)::NUMERIC;
+      expected_a := 1 / (1 + POWER(10, (rb - ra) / 400));
+      IF rec_pair.a_pts > rec_pair.b_pts THEN
         score_a := 1;
-      elsif rec_pair.a_pts < rec_pair.b_pts then
+      ELSIF rec_pair.a_pts < rec_pair.b_pts THEN
         score_a := 0;
-      else
+      ELSE
         score_a := 0.5;
-      end if;
+      END IF;
       delta := kFactor * (score_a - expected_a);
-      -- increment delta for player A
-      current_delta := coalesce((deltas ->> rec_pair.a_id::text)::numeric, 0);
-      deltas := jsonb_set(deltas, array[rec_pair.a_id::text], to_jsonb(current_delta + delta));
-      -- decrement delta for player B
-      current_delta := coalesce((deltas ->> rec_pair.b_id::text)::numeric, 0);
-      deltas := jsonb_set(deltas, array[rec_pair.b_id::text], to_jsonb(current_delta - delta));
-    end loop;
-    -- Performance adjustment
-    select avg(points) into avg_points from match_entries where match_id = rec_match.id;
-    for rec_player in select player_id, points from match_entries where match_id = rec_match.id loop
-      current_delta := (deltas ->> rec_player.player_id::text)::numeric;
-      perf_adj := kPerf * tanh((rec_player.points - avg_points) / scale);
-      deltas := jsonb_set(deltas, array[rec_player.player_id::text], to_jsonb(current_delta + perf_adj));
-    end loop;
-    -- Update ratings and insert history rows
-    for rec_player in select player_id from match_entries where match_id = rec_match.id loop
-      new_rating := (rating_by_id ->> rec_player.player_id::text)::numeric + (deltas ->> rec_player.player_id::text)::numeric;
-      rating_by_id := jsonb_set(rating_by_id, array[rec_player.player_id::text], to_jsonb(new_rating));
-      insert into rating_history (match_id, player_id, rating_after, delta, created_at)
-        values (rec_match.id, rec_player.player_id, new_rating, (deltas ->> rec_player.player_id::text)::numeric, rec_match.match_date);
-    end loop;
-  end loop;
-end;
+      current_delta := COALESCE((deltas ->> rec_pair.a_id::text)::NUMERIC, 0);
+      deltas := jsonb_set(deltas, ARRAY[rec_pair.a_id::text], TO_JSONB(current_delta + delta));
+      current_delta := COALESCE((deltas ->> rec_pair.b_id::text)::NUMERIC, 0);
+      deltas := jsonb_set(deltas, ARRAY[rec_pair.b_id::text], TO_JSONB(current_delta - delta));
+    END LOOP;
+    SELECT AVG(points) INTO avg_points FROM match_entries WHERE match_id = rec_match.id;
+    FOR rec_player IN SELECT player_id, points FROM match_entries WHERE match_id = rec_match.id LOOP
+      current_delta := (deltas ->> rec_player.player_id::text)::NUMERIC;
+      perf_adj := kPerf * tanh((rec_player.points - avg_points) / scale_param);
+      deltas := jsonb_set(deltas, ARRAY[rec_player.player_id::text], TO_JSONB(current_delta + perf_adj));
+    END LOOP;
+    FOR rec_player IN SELECT player_id FROM match_entries WHERE match_id = rec_match.id LOOP
+      new_rating := (rating_by_id ->> rec_player.player_id::text)::NUMERIC + (deltas ->> rec_player.player_id::text)::NUMERIC;
+      rating_by_id := jsonb_set(rating_by_id, ARRAY[rec_player.player_id::text], TO_JSONB(new_rating));
+      INSERT INTO rating_history (match_id, player_id, rating_after, delta, created_at)
+        VALUES (rec_match.id, rec_player.player_id, new_rating, (deltas ->> rec_player.player_id::text)::NUMERIC, rec_match.match_date);
+    END LOOP;
+  END LOOP;
+END;
 $$;
 
--- View: latest rating per player
-create or replace view v_player_current_rating as
-select
-  p.id as player_id,
+-- Views
+CREATE OR REPLACE VIEW v_player_current_rating AS
+with 
+mat as (
+select 
+*
+, row_number() over(order by created_at asc) as rank
+from matches
+)
+SELECT
+  p.id AS player_id,
   p.name,
-  coalesce(r.rating_after, null) as rating,
-  r.created_at as rating_ts
-from players p
-left join lateral (
-  select rh.rating_after, rh.created_at
-  from rating_history rh
-  where rh.player_id = p.id
-  order by rh.created_at desc
-  limit 1
-) r on true;
+  COALESCE(r.rating_after, NULL) AS rating,
+  r.created_at AS rating_ts
+FROM players p
+LEFT JOIN LATERAL (
+  SELECT rh.rating_after, rh.created_at, rank
+  FROM rating_history rh
+  left join  mat on mat.id = rh.match_id
+  WHERE rh.player_id = p.id
+  ORDER BY mat.rank desc, rh.created_at DESC
+  LIMIT 1
+) r ON TRUE;
 
--- View: dashboard statistics (players who have played at least 1 match)
 create or replace view v_dashboard_players as
 with games as (
   select

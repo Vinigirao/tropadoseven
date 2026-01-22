@@ -143,9 +143,15 @@ export default function DashboardPage() {
             Ranking público (jogadores aparecem após sua primeira partida)
           </div>
         </div>
-        <a href="/admin" className="muted">
-          Admin
-        </a>
+        <div className="row" style={{ gap: 12 }}>
+          {/* Link to player comparison page */}
+          <a href="/compare" className="muted">
+            Comparar jogadores
+          </a>
+          <a href="/admin" className="muted">
+            Admin
+          </a>
+        </div>
       </div>
 
       <div className="grid">
@@ -174,7 +180,15 @@ export default function DashboardPage() {
               {rows.map((r, i) => (
                 <tr key={r.player_id}>
                   <td>{i + 1}</td>
-                  <td>{r.name}</td>
+                  {/* Make player names link to their profile page */}
+                  <td>
+                    <a
+                      href={`/players/${r.player_id}`}
+                      style={{ color: "#e9eefc", textDecoration: "none" }}
+                    >
+                      {r.name}
+                    </a>
+                  </td>
                   <td className="right">
                     <b>{Math.round(r.rating)}</b>
                   </td>
