@@ -202,6 +202,15 @@ delta10 as (
   where rn <= 10
   group by player_id
 )
+-- Total points per player across all matches.  This summarises the overall
+-- scoring contribution and can be surfaced in dashboards.
+, total as (
+  select
+    player_id,
+    sum(points) as total_points
+  from match_entries
+  group by player_id
+)
 select
   p.player_id,
   p.name,
@@ -209,11 +218,13 @@ select
   g.games,
   g.avg_points,
   (w.wins / nullif(g.games, 0)) as win_pct,
-  coalesce(d.delta_last_10, 0) as delta_last_10
+  coalesce(d.delta_last_10, 0) as delta_last_10,
+  coalesce(total.total_points, 0) as total_points
 from v_player_current_rating p
 join games g on g.player_id = p.player_id
 left join wins w on w.player_id = p.player_id
-left join delta10 d on d.player_id = p.player_id;
+left join delta10 d on d.player_id = p.player_id
+left join total on total.player_id = p.player_id;
 
 -- View: rating history with match order index for charting.
 create or replace view v_rating_history_with_order as
