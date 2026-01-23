@@ -666,33 +666,34 @@ export default function DashboardPage() {
                 else if (i === rows.length - 1) rowClass = "bottom";
                 return (
                   <tr key={r.player_id} className={rowClass}>
-                  <td>
-                    {/* Show trophy emojis for the top 3 positions and a trash can for the last position. */}
-                    {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
-                    {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
-                    {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
-                    {i === rows.length - 1 && i > 2 && <span style={{ marginRight: 4 }}>🗑️</span>}
-                    {i + 1}
-                  </td>
-                  <td>
-                    {/* Make player name a styled button‑like link to emphasise profile access */}
-                    <a href={`/players/${r.player_id}`} className="profile-link">{r.name}</a>
-                  </td>
-                  <td className="right">{r.wins ?? 0}</td>
-                  <td className="right"><b>{Math.round(r.rating)}</b></td>
-                  <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
-                  <td className="right">{Math.round(Number(r.avg_points))}</td>
-                  <td className="right">{r.games}</td>
-                  <td className="right">{r.max_score !== undefined ? Math.round(r.max_score) : "-"}</td>
-                  <td className="right">{r.win_streak ?? 0}</td>
-                  <td className="right">{r.min_score !== undefined ? Math.round(r.min_score) : "-"}</td>
-                  <td className="right">
-                    {r.delta_last_10 > 0 && <span style={{ color: "#4caf50" }}>▲ {Number(r.delta_last_10).toFixed(1)}</span>}
-                    {r.delta_last_10 < 0 && <span style={{ color: "#e75a5a" }}>▼ {Number(r.delta_last_10).toFixed(1)}</span>}
-                    {r.delta_last_10 === 0 && <span style={{ color: "#93a4c7" }}>{Number(r.delta_last_10).toFixed(1)}</span>}
-                  </td>
-                </tr>
-              ))}
+                    <td>
+                      {/* Show trophy emojis for the top 3 positions and a trash can for the last position. */}
+                      {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
+                      {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
+                      {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
+                      {i === rows.length - 1 && i > 2 && <span style={{ marginRight: 4 }}>🗑️</span>}
+                      {i + 1}
+                    </td>
+                    <td>
+                      {/* Make player name a styled button‑like link to emphasise profile access */}
+                      <a href={`/players/${r.player_id}`} className="profile-link">{r.name}</a>
+                    </td>
+                    <td className="right">{r.wins ?? 0}</td>
+                    <td className="right"><b>{Math.round(r.rating)}</b></td>
+                    <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
+                    <td className="right">{Math.round(Number(r.avg_points))}</td>
+                    <td className="right">{r.games}</td>
+                    <td className="right">{r.max_score !== undefined ? Math.round(r.max_score) : "-"}</td>
+                    <td className="right">{r.win_streak ?? 0}</td>
+                    <td className="right">{r.min_score !== undefined ? Math.round(r.min_score) : "-"}</td>
+                    <td className="right">
+                      {r.delta_last_10 > 0 && <span style={{ color: "#4caf50" }}>▲ {Number(r.delta_last_10).toFixed(1)}</span>}
+                      {r.delta_last_10 < 0 && <span style={{ color: "#e75a5a" }}>▼ {Number(r.delta_last_10).toFixed(1)}</span>}
+                      {r.delta_last_10 === 0 && <span style={{ color: "#93a4c7" }}>{Number(r.delta_last_10).toFixed(1)}</span>}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
