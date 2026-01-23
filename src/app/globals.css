@@ -153,6 +153,42 @@ th {
   font-weight: 700;
 }
 
+/* Call‑to‑action links used for the "Comparar jogadores" and "Admin" buttons. */
+.cta-button {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: #2b7cff;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #4ea1ff;
+  transition: background 0.2s ease;
+}
+
+.cta-button:hover {
+  background: #1f60c8;
+}
+
+/* Secondary variant of CTA button, used for the Admin link. */
+.cta-button.secondary {
+  background: #eeb26f;
+  border-color: #f0c88d;
+  color: #0b1220;
+}
+
+.cta-button.secondary:hover {
+  background: #d89a55;
+}
+
+/* Styling for the last‑place summary card.  Uses a reddish accent to
+   draw attention and a playful tone. */
+.summary-card.last-place {
+  background: #2b1523;
+  border-color: #742d44;
+}
+
 .summary-delta {
   font-size: 14px;
   font-weight: 600;
