@@ -72,6 +72,7 @@ export default function DashboardPage() {
     bestImprovement: { name: "", value: 0 },
     worstDecline: { name: "", value: 0 },
     activeStreak: { name: "", value: 0 },
+    lastPlace: { name: "", rating: 0 },
   });
 
   // Load ranking data
@@ -138,8 +139,13 @@ export default function DashboardPage() {
     if (winsChartRef.current) {
       winsChartRef.current.destroy();
     }
-    const labels = rows.map((r) => r.name);
-    const dataPoints = rows.map((r) => (r.wins ?? 0));
+    // Sort players by number of wins in descending order to make the
+    // distribution easier to read.  Ties maintain their relative order.
+    const sortedRows = [...rows].sort(
+      (a, b) => (b.wins ?? 0) - (a.wins ?? 0),
+    );
+    const labels = sortedRows.map((r) => r.name);
+    const dataPoints = sortedRows.map((r) => r.wins ?? 0);
     winsChartRef.current = new Chart(canvas, {
       type: "bar",
       data: {
@@ -241,11 +247,19 @@ export default function DashboardPage() {
       }
     }
     const streakPlayerRow = rowsWithStats.find((r) => r.player_id === streakPid);
+
+    // Determine the last place by rating (smallest rating).  In case
+    // of ties, the first encountered lowest rating is chosen.
+    const sortedAsc = [...rowsWithStats].sort(
+      (a, b) => Number(a.rating) - Number(b.rating),
+    );
+    const last = sortedAsc[0];
     setSummary({
       topPlayer: { name: top.name, rating: top.rating, diff },
       bestImprovement: { name: best.name, value: Number(best.delta_last_10) },
       worstDecline: { name: worst.name, value: Number(worst.delta_last_10) },
       activeStreak: { name: streakPlayerRow?.name || streakPid, value: streakVal },
+      lastPlace: { name: last.name, rating: last.rating },
     });
   }
 
@@ -514,17 +528,18 @@ export default function DashboardPage() {
     <div className="container">
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}>Dashboard — 7 Wonders</h2>
+          <h2 style={{ margin: 0 }}>RATING DA TROPA DO 7</h2>
           <div className="muted">
-            Ranking público (jogadores aparecem após sua primeira partida)
+            Rating criado em janeiro/2026 para o jogo 7 Wonders. A temporada
+            termina no primeiro jogo da Copa de 2026.
           </div>
         </div>
         <div className="row" style={{ gap: 12 }}>
-          {/* Link to player comparison page */}
-          <a href="/compare" className="muted">
+          {/* Link to player comparison and admin pages.  Styled as call‑to‑action buttons for prominence. */}
+          <a href="/compare" className="cta-button">
             Comparar jogadores
           </a>
-          <a href="/admin" className="muted">
+          <a href="/admin" className="cta-button secondary">
             Admin
           </a>
         </div>
@@ -578,6 +593,20 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        {/* Last place card to tease the player at the bottom of the ranking */}
+        <div className="summary-card last-place">
+          <div className="summary-icon">🗑️</div>
+          <div className="summary-content">
+            <div className="summary-title">Lanterna</div>
+            <div className="summary-player-name">
+              {summary.lastPlace.name || "-"}
+            </div>
+            <div className="summary-number" style={{ color: "#e75a5a" }}>
+              {Math.round(summary.lastPlace.rating || 0)}
+            </div>
+            <div style={{ fontSize: 12, color: "#e75a5a" }}>treine mais!</div>
+          </div>
+        </div>
       </div>
 
       <div className="grid">
@@ -612,7 +641,18 @@ export default function DashboardPage() {
               )}
               {rows.map((r, i) => (
                 <tr key={r.player_id}>
-                  <td>{i + 1}</td>
+                  <td>
+                    {/* Show trophy emojis for the top 3 positions and a trash
+                        can for the last position.  The ranking number is
+                        displayed alongside the emoji. */}
+                    {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
+                    {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
+                    {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
+                    {i === rows.length - 1 && i > 2 && (
+                      <span style={{ marginRight: 4 }}>🗑️</span>
+                    )}
+                    {i + 1}
+                  </td>
                   {/* Make player names link to their profile page */}
                   <td>
                     <a
