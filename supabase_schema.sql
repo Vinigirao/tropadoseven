@@ -27,6 +27,9 @@ CREATE TABLE match_entries (
   match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
   player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   points NUMERIC NOT NULL,
+  -- Optional map field storing the wonder board used by the player in this match.
+  -- Existing matches will have NULL values and from now on this column should not be left blank.
+  map TEXT,
   PRIMARY KEY (match_id, player_id)
 );
 

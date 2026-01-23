@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     match_id: match.id,
     player_id: e.playerId,
     points: Number(e.points),
+    map: e.map ?? null,
   }));
   // Insert match entries
   const { error: entriesErr } = await sb.from("match_entries").insert(matchEntries);
