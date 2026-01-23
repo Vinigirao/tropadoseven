@@ -25,6 +25,21 @@ export default function AdminPage() {
   );
   const [selected, setSelected] = useState<string[]>([]);
   const [points, setPoints] = useState<Record<string, string>>({});
+  // Map selection per player for the current match.  Each player must
+  // choose a unique wonder board.
+  const [mapSelections, setMapSelections] = useState<Record<string, string>>({});
+
+  // List of available wonder boards (mapas) including the base game and the Leaders expansion.
+  const availableMaps = [
+    "Alexandria",
+    "Babylon",
+    "Ephesus",
+    "Giza",
+    "Halikarnassus",
+    "Olympia",
+    "Rhodes",
+    "Roma",
+  ];
   // List of existing matches for editing
   const [matches, setMatches] = useState<any[]>([]);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -96,10 +111,24 @@ export default function AdminPage() {
   // Register a new match
   async function addMatch() {
     setMsg("");
+    // Validate that all players have points and maps
     const entries = selected.map((id) => ({
       playerId: id,
       points: Number(points[id]),
+      map: mapSelections[id],
     }));
+    // Ensure no empty map values
+    if (entries.some((e) => !e.map)) {
+      setMsg("Todos os jogadores precisam ter um mapa definido");
+      return;
+    }
+    // Ensure no duplicate maps
+    const usedMaps = entries.map((e) => e.map);
+    const unique = new Set(usedMaps);
+    if (unique.size !== usedMaps.length) {
+      setMsg("Jogadores não podem repetir o mesmo mapa na mesma partida");
+      return;
+    }
     const res = await fetch("/api/admin/add-match", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -108,6 +137,7 @@ export default function AdminPage() {
     if (res.ok) {
       setSelected([]);
       setPoints({});
+      setMapSelections({});
       setMsg("Partida salva");
       loadMatches();
     } else {
@@ -123,7 +153,19 @@ export default function AdminPage() {
     const entries = selected.map((id) => ({
       playerId: id,
       points: Number(points[id]),
+      map: mapSelections[id],
     }));
+    // Validate maps
+    if (entries.some((e) => !e.map)) {
+      setMsg("Todos os jogadores precisam ter um mapa definido");
+      return;
+    }
+    const usedMaps = entries.map((e) => e.map);
+    const unique = new Set(usedMaps);
+    if (unique.size !== usedMaps.length) {
+      setMsg("Jogadores não podem repetir o mesmo mapa na mesma partida");
+      return;
+    }
     const res = await fetch("/api/admin/update-match", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -133,6 +175,7 @@ export default function AdminPage() {
       setEditingMatchId(null);
       setSelected([]);
       setPoints({});
+      setMapSelections({});
       setMatchDate(new Date().toISOString().slice(0, 10));
       setMsg("Partida atualizada");
       loadMatches();
@@ -179,10 +222,13 @@ export default function AdminPage() {
     const ids = match.match_entries.map((e: any) => e.player_id);
     setSelected(ids);
     const pts: Record<string, string> = {};
+    const maps: Record<string, string> = {};
     match.match_entries.forEach((e: any) => {
       pts[e.player_id] = e.points.toString();
+      maps[e.player_id] = e.map || "";
     });
     setPoints(pts);
+    setMapSelections(maps);
     setMsg("");
   }
 
@@ -191,6 +237,7 @@ export default function AdminPage() {
     setEditingMatchId(null);
     setSelected([]);
     setPoints({});
+    setMapSelections({});
     setMatchDate(new Date().toISOString().slice(0, 10));
     setMsg("");
   }
@@ -280,7 +327,33 @@ export default function AdminPage() {
                       onChange={(e) =>
                         setPoints((prev) => ({ ...prev, [id]: e.target.value }))
                       }
+                      style={{ width: "80px", marginRight: 8 }}
                     />
+                    {/* Map selection for each player.  Filter out maps already chosen by other players (except this player's current selection) */}
+                    <select
+                      value={mapSelections[id] || ""}
+                      onChange={(e) =>
+                        setMapSelections((prev) => ({ ...prev, [id]: e.target.value }))
+                      }
+                      style={{ flex: 1 }}
+                    >
+                      <option value="" disabled>
+                        Mapa
+                      </option>
+                      {availableMaps
+                        .filter((m) => {
+                          // Show the option if it hasn't been selected by another player or is the current selection
+                          const others = Object.entries(mapSelections)
+                            .filter(([pid]) => pid !== id)
+                            .map(([, val]) => val);
+                          return !others.includes(m) || mapSelections[id] === m;
+                        })
+                        .map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 );
               })}
@@ -310,7 +383,12 @@ export default function AdminPage() {
                     <strong>{match.match_date}</strong>
                     <div className="muted" style={{ fontSize: 12 }}>
                       {match.match_entries
-                        .map((e: any) => `${e.players?.name || e.player_id}: ${e.points}`)
+                        .map((e: any) => {
+                          const name = e.players?.name || e.player_id;
+                          const pts = e.points;
+                          const mp = e.map ? ` (${e.map})` : "";
+                          return `${name}: ${pts}${mp}`;
+                        })
                         .join(" | ")}
                       {"  "}
                       {/* Show total points for the match */}

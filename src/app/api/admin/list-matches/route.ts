@@ -18,7 +18,7 @@ export async function GET() {
   const { data: matches, error } = await sb
     .from("matches")
     .select(
-      "id, match_date, created_at, match_entries (player_id, points, players (name))",
+      "id, match_date, created_at, match_entries (player_id, points, map, players (name))",
     )
     .order("match_date", { ascending: false })
     .order("created_at", { ascending: false });

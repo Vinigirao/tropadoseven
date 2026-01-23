@@ -630,7 +630,8 @@ export default function DashboardPage() {
       </div>
 
       {/* Grid with ranking table.  Override the column layout to a single column since the score lists are moved elsewhere. */}
-      <div className="grid" style={{ gridTemplateColumns: "1fr" }}>
+      {/* Grid with ranking table and score lists.  Use two columns so that the lists appear to the right of the ranking. */}
+      <div className="grid" style={{ gridTemplateColumns: "2fr 1fr" }}>
         {/* Ranking table card */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Ranking</h3>
@@ -656,8 +657,15 @@ export default function DashboardPage() {
                   <td colSpan={11} className="muted">Nenhuma partida registrada ainda.</td>
                 </tr>
               )}
-              {rows.map((r, i) => (
-                <tr key={r.player_id}>
+              {rows.map((r, i) => {
+                // Determine row classes for styling top 3 and last positions
+                let rowClass = "";
+                if (i === 0) rowClass = "top-one";
+                else if (i === 1) rowClass = "top-two";
+                else if (i === 2) rowClass = "top-three";
+                else if (i === rows.length - 1) rowClass = "bottom";
+                return (
+                  <tr key={r.player_id} className={rowClass}>
                   <td>
                     {/* Show trophy emojis for the top 3 positions and a trash can for the last position. */}
                     {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
@@ -688,7 +696,35 @@ export default function DashboardPage() {
             </tbody>
           </table>
         </div>
-        {/* End of grid columns.  The second column has been removed; the score lists are moved into the wins distribution card. */}
+        {/* Card containing top and bottom score lists stacked vertically */}
+        <div className="card">
+          {topScores.length > 0 && lowScores.length > 0 && (
+            <div className="score-list-container" style={{ flexDirection: "column" }}>
+              <div className="score-card">
+                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
+                <ul className="score-list">
+                  {topScores.map((s, idx) => (
+                    <li key={idx} className="score-item">
+                      <span className="score-player" style={{ color: "#4caf50" }}>{s.player_name}</span>
+                      <span className="score-points" style={{ color: "#4caf50" }}>{s.points.toFixed(1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="score-card">
+                <div className="score-card-header" style={{ color: "#4ea1ff" }}>❄️ 5 Menores Pontuações</div>
+                <ul className="score-list">
+                  {lowScores.map((s, idx) => (
+                    <li key={idx} className="score-item">
+                      <span className="score-player" style={{ color: "#4ea1ff" }}>{s.player_name}</span>
+                      <span className="score-points" style={{ color: "#4ea1ff" }}>{s.points.toFixed(1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Charts column: rating evolution on top of wins distribution.  The two charts share the same width to align visually. */}
@@ -715,35 +751,6 @@ export default function DashboardPage() {
           <div>
             <canvas id="winsChart" height={160} />
           </div>
-          {/* Display the Top 5 and 5 lowest scores stacked underneath the chart.  The top list remains green and the bottom list inherits the same colour as its numbers (blue). */}
-          {topScores.length > 0 && lowScores.length > 0 && (
-            <div className="score-list-container" style={{ flexDirection: "column", marginTop: 16 }}>
-              {/* Top scores list */}
-              <div className="score-card">
-                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
-                <ul className="score-list">
-                  {topScores.map((s, idx) => (
-                    <li key={idx} className="score-item">
-                      <span className="score-player" style={{ color: "#4caf50" }}>{s.player_name}</span>
-                      <span className="score-points" style={{ color: "#4caf50" }}>{s.points.toFixed(1)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              {/* Bottom scores list with unified colour */}
-              <div className="score-card">
-                <div className="score-card-header" style={{ color: "#4ea1ff" }}>❄️ 5 Menores Pontuações</div>
-                <ul className="score-list">
-                  {lowScores.map((s, idx) => (
-                    <li key={idx} className="score-item">
-                      <span className="score-player" style={{ color: "#4ea1ff" }}>{s.player_name}</span>
-                      <span className="score-points" style={{ color: "#4ea1ff" }}>{s.points.toFixed(1)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>

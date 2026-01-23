@@ -84,6 +84,25 @@ tbody tr:nth-child(odd) {
   background: #0e1a33;
 }
 
+/* Highlight top ranking rows and the last row with subtle background colours */
+tbody tr.top-one {
+  background: #16284d;
+  font-weight: 600;
+}
+
+tbody tr.top-two {
+  background: #142449;
+}
+
+tbody tr.top-three {
+  background: #112040;
+}
+
+tbody tr.bottom {
+  background: #331625;
+  color: #e75a5a;
+}
+
 th {
   color: #93a4c7;
 }
@@ -216,10 +235,10 @@ th {
 .score-card-header {
   font-weight: 700;
   margin-bottom: 8px;
-  font-size: 14px;
+  font-size: 15px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 /* Container for stacking charts vertically.  Ensures rating and win charts
@@ -240,9 +259,9 @@ th {
 .score-item {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #233152;
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .score-item:last-child {
@@ -261,19 +280,21 @@ th {
 /* Profile link styling: make player names in the ranking table look like clickable buttons */
 .profile-link {
   display: inline-block;
-  padding: 4px 8px;
-  border-radius: 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
   background: #2b7cff;
   border: 1px solid #4ea1ff;
   color: #ffffff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-decoration: none;
   transition: background 0.2s ease;
+  box-shadow: 0 0 4px rgba(46, 75, 129, 0.6);
 }
 
 .profile-link:hover {
   background: #1f60c8;
+  box-shadow: 0 0 6px rgba(46, 75, 129, 0.9);
 }
 
 /* Adjust arrow colours for delta values by default; override in inline styles in component. */
