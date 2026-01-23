@@ -19,6 +19,14 @@ type DashRow = {
   max_score?: number;
   min_score?: number;
   win_streak?: number;
+  /**
+   * Total number of wins for this player.  A win is counted when the
+   * player achieves the highest point total in a given match (ties
+   * count as wins for all tied players).  This value is computed
+   * dynamically alongside other metrics and displayed in the ranking
+   * table.
+   */
+  wins?: number;
 };
 
 // Each history row includes the global match order index so the X axis
@@ -41,6 +49,10 @@ export default function DashboardPage() {
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const chartRef = useRef<Chart | null>(null);
+  // Chart reference for the wins bar chart.  This reference allows
+  // us to destroy the chart before re‑rendering to avoid memory
+  // leaks.
+  const winsChartRef = useRef<Chart | null>(null);
   // Hold the top and bottom scores across all players.  Each entry
   // contains the player name, the score and the match date.  These
   // arrays are populated alongside the dashboard rows when loading the
@@ -113,6 +125,76 @@ export default function DashboardPage() {
   useEffect(() => {
     loadHistory(selectedPlayers);
   }, [selectedPlayers]);
+
+  // Build a bar chart showing the total wins per player.  This chart
+  // is rendered whenever the ranking rows change.  It uses the
+  // Chart.js bar type and hides the legend for a cleaner look.  The
+  // X axis lists player names and the Y axis shows the number of
+  // victories.  Colours are harmonised with the rest of the dashboard.
+  useEffect(() => {
+    const canvas = document.getElementById("winsChart") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    // Destroy any existing chart before creating a new one
+    if (winsChartRef.current) {
+      winsChartRef.current.destroy();
+    }
+    const labels = rows.map((r) => r.name);
+    const dataPoints = rows.map((r) => (r.wins ?? 0));
+    winsChartRef.current = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels,
+        datasets: [
+          {
+            label: "Vitórias",
+            data: dataPoints,
+            backgroundColor: "#4ea1ff",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: false,
+          },
+        },
+        scales: {
+          x: {
+            title: {
+              display: true,
+              text: "Jogador",
+              color: "#e9eefc",
+            },
+            ticks: {
+              color: "#93a4c7",
+              autoSkip: false,
+              maxRotation: 90,
+              minRotation: 45,
+            },
+            grid: {
+              color: "rgba(35, 49, 82, 0.5)",
+            },
+          },
+          y: {
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "Vitórias",
+              color: "#e9eefc",
+            },
+            ticks: {
+              color: "#93a4c7",
+              precision: 0,
+            },
+            grid: {
+              color: "rgba(35, 49, 82, 0.5)",
+            },
+          },
+        },
+      },
+    });
+  }, [rows]);
 
   /**
    * Compute high-level summary metrics for the dashboard.  These include
@@ -272,9 +354,15 @@ export default function DashboardPage() {
     // per‑player current streak and maximum observed streak.  When a
     // player wins (has the maximum points in the match), increment
     // their current streak; otherwise reset it.  Players who do not
-    // participate in a given match retain their current streak.
+    // participate in a given match retain their current streak.  At
+    // the same time, accumulate a count of total wins for each
+    // player.  A win is recorded for each player whose points are
+    // equal to the maximum for that match (ties count as wins).
     const currentStreak: Record<string, number> = {};
     const winStreakMap: Record<string, number> = {};
+    // Map of total wins per player.  Incremented whenever a player
+    // achieves the highest score in a match.
+    const winsCount: Record<string, number> = {};
     matchIdList.forEach((matchId) => {
       const entries = matchGroups[matchId];
       if (!entries || entries.length === 0) return;
@@ -287,6 +375,11 @@ export default function DashboardPage() {
       const winners = entries
         .filter((e) => e.points === maxPts)
         .map((e) => e.player_id);
+      // Increase win count for each winner.  Ties count for all
+      // participating winners.
+      winners.forEach((pid) => {
+        winsCount[pid] = (winsCount[pid] || 0) + 1;
+      });
       // Update streaks for participating players.
       for (const e of entries) {
         const pid = e.player_id;
@@ -333,12 +426,17 @@ export default function DashboardPage() {
     });
 
     // Merge the computed statistics back into the dashboard rows.
+    // In addition to max/min scores and streaks, include the total
+    // number of wins per player.  If a player has never won, default
+    // to 0.  We avoid mutating the original baseRows array so that
+    // React detects state changes correctly.
     const rowsWithStats: DashRow[] = baseRows.map((row) => {
       return {
         ...row,
         max_score: maxMinMap[row.player_id]?.max ?? undefined,
         min_score: maxMinMap[row.player_id]?.min ?? undefined,
         win_streak: winStreakMap[row.player_id] ?? 0,
+        wins: winsCount[row.player_id] ?? 0,
       };
     });
     // Capture the current streak map so that the UI can compute active
@@ -483,6 +581,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid">
+        {/* Ranking table card */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Ranking</h3>
           <table>
@@ -490,22 +589,23 @@ export default function DashboardPage() {
               <tr>
                 <th>#</th>
                 <th>Jogador</th>
+                <th className="right">Vitórias</th>
                 <th className="right">Rating</th>
                 <th className="right">% Vitórias</th>
                 <th className="right">Média</th>
                 <th className="right">Partidas</th>
-                <th className="right">Δ (10)</th>
                 {/* Additional columns for maximum score, winning streak and worst score */}
                 <th className="right">Máx</th>
                 <th className="right">Streak</th>
                 <th className="right">Pior</th>
+                <th className="right">Δ (10)</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  {/* The column span should match the total number of table columns (10) */}
-                  <td colSpan={10} className="muted">
+                  {/* The column span should match the total number of table columns (11) */}
+                  <td colSpan={11} className="muted">
                     Nenhuma partida registrada ainda.
                   </td>
                 </tr>
@@ -522,24 +622,52 @@ export default function DashboardPage() {
                       {r.name}
                     </a>
                   </td>
+                  {/* Wins column */}
+                  <td className="right">{r.wins ?? 0}</td>
+                  {/* Rating column */}
                   <td className="right">
                     <b>{Math.round(r.rating)}</b>
                   </td>
+                  {/* Win percentage */}
                   <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
+                  {/* Average points */}
                   <td className="right">{Number(r.avg_points).toFixed(1)}</td>
+                  {/* Total games */}
                   <td className="right">{r.games}</td>
-                  <td className="right">{Number(r.delta_last_10).toFixed(1)}</td>
-                  {/* Display the maximum score (if available) */}
-                  <td className="right">{r.max_score !== undefined ? r.max_score.toFixed(1) : "-"}</td>
-                  {/* Display the longest winning streak */}
+                  {/* Max score */}
+                  <td className="right">
+                    {r.max_score !== undefined ? r.max_score.toFixed(1) : "-"}
+                  </td>
+                  {/* Longest streak */}
                   <td className="right">{r.win_streak ?? 0}</td>
-                  {/* Display the worst score (if available) */}
-                  <td className="right">{r.min_score !== undefined ? r.min_score.toFixed(1) : "-"}</td>
+                  {/* Worst score */}
+                  <td className="right">
+                    {r.min_score !== undefined ? r.min_score.toFixed(1) : "-"}
+                  </td>
+                  {/* Delta column displayed at end with arrow icon.  Use a green up arrow for positive values and red down arrow for negative values.  Zero is shown without an arrow. */}
+                  <td className="right">
+                    {r.delta_last_10 > 0 && (
+                      <span style={{ color: "#4caf50" }}>
+                        ▲ {Number(r.delta_last_10).toFixed(1)}
+                      </span>
+                    )}
+                    {r.delta_last_10 < 0 && (
+                      <span style={{ color: "#e75a5a" }}>
+                        ▼ {Number(r.delta_last_10).toFixed(1)}
+                      </span>
+                    )}
+                    {r.delta_last_10 === 0 && (
+                      <span style={{ color: "#93a4c7" }}>
+                        {Number(r.delta_last_10).toFixed(1)}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        {/* Rating evolution and score lists card */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Evolução do Rating</h3>
           <div className="muted" style={{ marginBottom: 8 }}>
@@ -564,42 +692,45 @@ export default function DashboardPage() {
           <div style={{ marginTop: 12 }}>
             <canvas id="ratingChart" height={140} />
           </div>
-          {/* Display lists of highest and lowest scores next to the chart. */}
+          {/* Display lists of highest and lowest scores next to the chart.  We
+              remove the match date, place the lists in boxed cards and
+              add emojis to the headings for a more playful look. */}
           {topScores.length > 0 && lowScores.length > 0 && (
-            <div
-              style={{
-                marginTop: 16,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 24,
-              }}
-            >
-              <div>
-                <h4 style={{ margin: "4px 0" }}>Top 5 Pontuações</h4>
-                <ul style={{ margin: 0, paddingLeft: 16, listStyleType: "none" }}>
+            <div className="score-list-container">
+              <div className="score-card">
+                <div className="score-card-header">🔥 Top 5 Pontuações</div>
+                <ul className="score-list">
                   {topScores.map((s, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>
-                      <span style={{ marginRight: 8 }}>{s.match_date || ""}</span>
-                      <span style={{ marginRight: 8 }}>{s.player_name}</span>
-                      <b>{s.points.toFixed(1)}</b>
+                    <li key={idx} className="score-item">
+                      <span className="score-player">{s.player_name}</span>
+                      <span className="score-points">{s.points.toFixed(1)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-              <div>
-                <h4 style={{ margin: "4px 0" }}>5 Menores Pontuações</h4>
-                <ul style={{ margin: 0, paddingLeft: 16, listStyleType: "none" }}>
+              <div className="score-card">
+                <div className="score-card-header">❄️ 5 Menores Pontuações</div>
+                <ul className="score-list">
                   {lowScores.map((s, idx) => (
-                    <li key={idx} style={{ marginBottom: 4 }}>
-                      <span style={{ marginRight: 8 }}>{s.match_date || ""}</span>
-                      <span style={{ marginRight: 8 }}>{s.player_name}</span>
-                      <b>{s.points.toFixed(1)}</b>
+                    <li key={idx} className="score-item">
+                      <span className="score-player">{s.player_name}</span>
+                      <span className="score-points">{s.points.toFixed(1)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
             </div>
           )}
+        </div>
+      </div>
+      {/* Wins distribution card.  This card displays a bar chart
+          summarising the total number of wins for each player.  The
+          chart complements the ranking table and helps visualise
+          dominance across all participants. */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <h3 style={{ marginTop: 0 }}>Distribuição de Vitórias</h3>
+        <div>
+          <canvas id="winsChart" height={160} />
         </div>
       </div>
     </div>

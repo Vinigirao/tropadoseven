@@ -79,6 +79,11 @@ td {
   text-align: left;
 }
 
+/* Zebra striping for table rows to improve readability on dark backgrounds. */
+tbody tr:nth-child(odd) {
+  background: #0e1a33;
+}
+
 th {
   color: #93a4c7;
 }
@@ -152,3 +157,60 @@ th {
   font-size: 14px;
   font-weight: 600;
 }
+
+/* Score list styling for top/bottom scores on the dashboard.  These
+   lists are displayed in small cards adjacent to the rating chart. */
+.score-list-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.score-card {
+  background: #121b2e;
+  border: 1px solid #233152;
+  border-radius: 14px;
+  padding: 12px;
+  min-width: 160px;
+  flex: 1;
+  color: #e9eefc;
+}
+
+.score-card-header {
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.score-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid #233152;
+  font-size: 12px;
+}
+
+.score-item:last-child {
+  border-bottom: none;
+}
+
+.score-player {
+  color: #e9eefc;
+}
+
+.score-points {
+  font-weight: 700;
+  color: #4ea1ff;
+}
+
+/* Adjust arrow colours for delta values by default; override in inline styles in component. */
