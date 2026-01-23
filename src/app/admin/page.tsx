@@ -39,6 +39,7 @@ export default function AdminPage() {
     "Olympia",
     "Rhodes",
     "Roma",
+    "Abu Simbel"
   ];
   // List of existing matches for editing
   const [matches, setMatches] = useState<any[]>([]);
