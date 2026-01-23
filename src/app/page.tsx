@@ -526,22 +526,20 @@ export default function DashboardPage() {
 
   return (
     <div className="container">
+      {/* Header with title, description and navigation buttons */}
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
         <div>
-          <h2 style={{ margin: 0 }}>RATING DA TROPA DO 7</h2>
+          <h2 style={{ margin: 0 }}>RATING DA TROPA DO 7</h2>
+          {/* Describe the origin of the rating and mention Brazil’s opening match at the 2026 World Cup. */}
           <div className="muted">
-            Rating criado em janeiro/2026 para o jogo 7 Wonders. A temporada
-            termina no primeiro jogo da Copa de 2026.
+            Rating criado em janeiro/2026 para o jogo 7 Wonders. A temporada encerra-se
+            no primeiro jogo da Copa de 2026 (Brasil × Marrocos, 13/06/2026).
           </div>
         </div>
         <div className="row" style={{ gap: 12 }}>
           {/* Link to player comparison and admin pages.  Styled as call‑to‑action buttons for prominence. */}
-          <a href="/compare" className="cta-button">
-            Comparar jogadores
-          </a>
-          <a href="/admin" className="cta-button secondary">
-            Admin
-          </a>
+          <a href="/compare" className="cta-button">Comparar jogadores</a>
+          <a href="/admin" className="cta-button secondary">Admin</a>
         </div>
       </div>
 
@@ -588,9 +586,7 @@ export default function DashboardPage() {
           <div className="summary-content">
             <div className="summary-title">Maior Streak Ativa</div>
             <div className="summary-player-name">{summary.activeStreak.name || "-"}</div>
-            <div className="summary-number" style={{ color: "#f0ad4e" }}>
-              {summary.activeStreak.value}
-            </div>
+            <div className="summary-number" style={{ color: "#f0ad4e" }}>{summary.activeStreak.value}</div>
           </div>
         </div>
         {/* Last place card to tease the player at the bottom of the ranking */}
@@ -598,17 +594,14 @@ export default function DashboardPage() {
           <div className="summary-icon">🗑️</div>
           <div className="summary-content">
             <div className="summary-title">Lanterna</div>
-            <div className="summary-player-name">
-              {summary.lastPlace.name || "-"}
-            </div>
-            <div className="summary-number" style={{ color: "#e75a5a" }}>
-              {Math.round(summary.lastPlace.rating || 0)}
-            </div>
+            <div className="summary-player-name">{summary.lastPlace.name || "-"}</div>
+            <div className="summary-number" style={{ color: "#e75a5a" }}>{Math.round(summary.lastPlace.rating || 0)}</div>
             <div style={{ fontSize: 12, color: "#e75a5a" }}>treine mais!</div>
           </div>
         </div>
       </div>
 
+      {/* Grid with ranking table and extreme score lists */}
       <div className="grid">
         {/* Ranking table card */}
         <div className="card">
@@ -623,133 +616,68 @@ export default function DashboardPage() {
                 <th className="right">% Vitórias</th>
                 <th className="right">Média</th>
                 <th className="right">Partidas</th>
-                {/* Additional columns for maximum score, winning streak and worst score */}
                 <th className="right">Máx</th>
                 <th className="right">Streak</th>
                 <th className="right">Pior</th>
-                <th className="right">Δ (10)</th>
+                <th className="right">Δ (10)</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  {/* The column span should match the total number of table columns (11) */}
-                  <td colSpan={11} className="muted">
-                    Nenhuma partida registrada ainda.
-                  </td>
+                  <td colSpan={11} className="muted">Nenhuma partida registrada ainda.</td>
                 </tr>
               )}
               {rows.map((r, i) => (
                 <tr key={r.player_id}>
                   <td>
-                    {/* Show trophy emojis for the top 3 positions and a trash
-                        can for the last position.  The ranking number is
-                        displayed alongside the emoji. */}
+                    {/* Show trophy emojis for the top 3 positions and a trash can for the last position. */}
                     {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
                     {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
                     {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
-                    {i === rows.length - 1 && i > 2 && (
-                      <span style={{ marginRight: 4 }}>🗑️</span>
-                    )}
+                    {i === rows.length - 1 && i > 2 && <span style={{ marginRight: 4 }}>🗑️</span>}
                     {i + 1}
                   </td>
-                  {/* Make player names link to their profile page */}
                   <td>
-                    <a
-                      href={`/players/${r.player_id}`}
-                      style={{ color: "#e9eefc", textDecoration: "none" }}
-                    >
-                      {r.name}
-                    </a>
+                    <a href={`/players/${r.player_id}`} style={{ color: "#e9eefc", textDecoration: "none" }}>{r.name}</a>
                   </td>
-                  {/* Wins column */}
-                  <td className="right">{r.wins ?? 0}</td>
-                  {/* Rating column */}
-                  <td className="right">
-                    <b>{Math.round(r.rating)}</b>
-                  </td>
-                  {/* Win percentage */}
+                    <td className="right">{r.wins ?? 0}</td>
+                  <td className="right"><b>{Math.round(r.rating)}</b></td>
                   <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
-                  {/* Average points */}
                   <td className="right">{Number(r.avg_points).toFixed(1)}</td>
-                  {/* Total games */}
                   <td className="right">{r.games}</td>
-                  {/* Max score */}
-                  <td className="right">
-                    {r.max_score !== undefined ? r.max_score.toFixed(1) : "-"}
-                  </td>
-                  {/* Longest streak */}
+                  <td className="right">{r.max_score !== undefined ? r.max_score.toFixed(1) : "-"}</td>
                   <td className="right">{r.win_streak ?? 0}</td>
-                  {/* Worst score */}
+                  <td className="right">{r.min_score !== undefined ? r.min_score.toFixed(1) : "-"}</td>
                   <td className="right">
-                    {r.min_score !== undefined ? r.min_score.toFixed(1) : "-"}
-                  </td>
-                  {/* Delta column displayed at end with arrow icon.  Use a green up arrow for positive values and red down arrow for negative values.  Zero is shown without an arrow. */}
-                  <td className="right">
-                    {r.delta_last_10 > 0 && (
-                      <span style={{ color: "#4caf50" }}>
-                        ▲ {Number(r.delta_last_10).toFixed(1)}
-                      </span>
-                    )}
-                    {r.delta_last_10 < 0 && (
-                      <span style={{ color: "#e75a5a" }}>
-                        ▼ {Number(r.delta_last_10).toFixed(1)}
-                      </span>
-                    )}
-                    {r.delta_last_10 === 0 && (
-                      <span style={{ color: "#93a4c7" }}>
-                        {Number(r.delta_last_10).toFixed(1)}
-                      </span>
-                    )}
+                    {r.delta_last_10 > 0 && <span style={{ color: "#4caf50" }}>▲ {Number(r.delta_last_10).toFixed(1)}</span>}
+                    {r.delta_last_10 < 0 && <span style={{ color: "#e75a5a" }}>▼ {Number(r.delta_last_10).toFixed(1)}</span>}
+                    {r.delta_last_10 === 0 && <span style={{ color: "#93a4c7" }}>{Number(r.delta_last_10).toFixed(1)}</span>}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {/* Rating evolution and score lists card */}
+        {/* Card containing top and bottom score lists */}
         <div className="card">
-          <h3 style={{ marginTop: 0 }}>Evolução do Rating</h3>
-          <div className="muted" style={{ marginBottom: 8 }}>
-            Selecione jogadores para comparar
-          </div>
-          <select
-            multiple
-            value={selectedPlayers}
-            onChange={(e) =>
-              setSelectedPlayers(
-                Array.from(e.target.selectedOptions).map((o) => o.value),
-              )
-            }
-            style={{ width: "100%", height: 140 }}
-          >
-            {rows.map((r) => (
-              <option key={r.player_id} value={r.player_id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-          <div style={{ marginTop: 12 }}>
-            <canvas id="ratingChart" height={140} />
-          </div>
-          {/* Display lists of highest and lowest scores next to the chart.  We
-              remove the match date, place the lists in boxed cards and
-              add emojis to the headings for a more playful look. */}
+          {/* Only show lists when data has been computed */}
           {topScores.length > 0 && lowScores.length > 0 && (
-            <div className="score-list-container">
+            <div className="score-list-container" style={{ marginTop: 0 }}>
               <div className="score-card">
-                <div className="score-card-header">🔥 Top 5 Pontuações</div>
+                {/* Green emoji and green text for top scores */}
+                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
                 <ul className="score-list">
                   {topScores.map((s, idx) => (
                     <li key={idx} className="score-item">
-                      <span className="score-player">{s.player_name}</span>
-                      <span className="score-points">{s.points.toFixed(1)}</span>
+                      <span className="score-player" style={{ color: "#4caf50" }}>{s.player_name}</span>
+                      <span className="score-points" style={{ color: "#4caf50" }}>{s.points.toFixed(1)}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <div className="score-card">
-                <div className="score-card-header">❄️ 5 Menores Pontuações</div>
+                <div className="score-card-header">❄️ 5 Menores Pontuações</div>
                 <ul className="score-list">
                   {lowScores.map((s, idx) => (
                     <li key={idx} className="score-item">
@@ -763,14 +691,31 @@ export default function DashboardPage() {
           )}
         </div>
       </div>
-      {/* Wins distribution card.  This card displays a bar chart
-          summarising the total number of wins for each player.  The
-          chart complements the ranking table and helps visualise
-          dominance across all participants. */}
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Distribuição de Vitórias</h3>
-        <div>
-          <canvas id="winsChart" height={160} />
+
+      {/* Charts column: rating evolution on top of wins distribution.  The two charts share the same width to align visually. */}
+      <div className="charts-container">
+        <div className="card">
+          <h3 style={{ marginTop: 0 }}>Evolução do Rating</h3>
+          <div className="muted" style={{ marginBottom: 8 }}>Selecione jogadores para comparar</div>
+          <select
+            multiple
+            value={selectedPlayers}
+            onChange={(e) => setSelectedPlayers(Array.from(e.target.selectedOptions).map((o) => o.value))}
+            style={{ width: "100%", height: 140 }}
+          >
+            {rows.map((r) => (
+              <option key={r.player_id} value={r.player_id}>{r.name}</option>
+            ))}
+          </select>
+          <div style={{ marginTop: 12 }}>
+            <canvas id="ratingChart" height={160} />
+          </div>
+        </div>
+        <div className="card" style={{ marginTop: 24 }}>
+          <h3 style={{ marginTop: 0 }}>Distribuição de Vitórias</h3>
+          <div>
+            <canvas id="winsChart" height={160} />
+          </div>
         </div>
       </div>
     </div>
