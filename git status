@@ -1,0 +1,151 @@
+warning: in the working copy of 'src/app/page.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/app/players/[id]/page.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/app/page.tsx b/src/app/page.tsx[m
+[1mindex fb8aa6e..f7e6406 100644[m
+[1m--- a/src/app/page.tsx[m
+[1m+++ b/src/app/page.tsx[m
+[36m@@ -4,6 +4,10 @@[m [mimport { useEffect, useRef, useState } from "react";[m
+ import { createClient } from "@supabase/supabase-js";[m
+ import Chart from "chart.js/auto";[m
+ [m
+[32m+[m[32m// Extend the dashboard row type to include additional statistics for[m
+[32m+[m[32m// maximum score, minimum score and longest winning streak.  These[m
+[32m+[m[32m// fields are optional because they are populated asynchronously[m
+[32m+[m[32m// after the initial ranking data is loaded.[m
+ type DashRow = {[m
+   player_id: string;[m
+   name: string;[m
+[36m@@ -12,6 +16,9 @@[m [mtype DashRow = {[m
+   avg_points: number;[m
+   win_pct: number;[m
+   delta_last_10: number;[m
+[32m+[m[32m  max_score?: number;[m
+[32m+[m[32m  min_score?: number;[m
+[32m+[m[32m  win_streak?: number;[m
+ };[m
+ [m
+ // Each history row includes the global match order index so the X axis[m
+[36m@@ -34,6 +41,16 @@[m [mexport default function DashboardPage() {[m
+   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);[m
+   const [history, setHistory] = useState<HistoryRow[]>([]);[m
+   const chartRef = useRef<Chart | null>(null);[m
+[32m+[m[32m  // Hold the top and bottom scores across all players.  Each entry[m
+[32m+[m[32m  // contains the player name, the score and the match date.  These[m
+[32m+[m[32m  // arrays are populated alongside the dashboard rows when loading the[m
+[32m+[m[32m  // dashboard data.[m
+[32m+[m[32m  const [topScores, setTopScores] = useState<[m
+[32m+[m[32m    { player_name: string; points: number; match_date: string | null }[][m
+[32m+[m[32m  >([]);[m
+[32m+[m[32m  const [lowScores, setLowScores] = useState<[m
+[32m+[m[32m    { player_name: string; points: number; match_date: string | null }[][m
+[32m+[m[32m  >([]);[m
+ [m
+   // Load ranking data[m
+   async function loadDashboard() {[m
+[36m@@ -42,8 +59,21 @@[m [mexport default function DashboardPage() {[m
+       .select("*")[m
+       .order("rating", { ascending: false });[m
+     if (!error && data) {[m
+[31m-      setRows(data as unknown as DashRow[]);[m
+[31m-      setSelectedPlayers(data.slice(0, 5).map((d: any) => d.player_id));[m
+[32m+[m[32m      // Convert the raw rows into our extended DashRow type.  The[m
+[32m+[m[32m      // additional statistics (max_score, min_score, win_streak) will[m
+[32m+[m[32m      // be computed below.  We intentionally avoid mutating the[m
+[32m+[m[32m      // original data array so that React can detect state changes.[m
+[32m+[m[32m      const baseRows: DashRow[] = (data as unknown as DashRow[]).map((r) => ({[m
+[32m+[m[32m        ...r,[m
+[32m+[m[32m      }));[m
+[32m+[m[32m      // Preselect the top 5 players for the rating chart.[m
+[32m+[m[32m      setSelectedPlayers(baseRows.slice(0, 5).map((d) => d.player_id));[m
+[32m+[m[32m      // Compute additional metrics for each player and the global top/bottom scores.[m
+[32m+[m[32m      computeAdditionalMetrics(baseRows).then(({ rowsWithStats, highs, lows }) => {[m
+[32m+[m[32m        setRows(rowsWithStats);[m
+[32m+[m[32m        setTopScores(highs);[m
+[32m+[m[32m        setLowScores(lows);[m
+[32m+[m[32m      });[m
+     }[m
+   }[m
+ [m
+[36m@@ -70,6 +100,177 @@[m [mexport default function DashboardPage() {[m
+     loadHistory(selectedPlayers);[m
+   }, [selectedPlayers]);[m
+ [m
+[32m+[m[32m  /**[m
+[32m+[m[32m   * Compute additional statistics for the dashboard.  Given the base[m
+[32m+[m[32m   * ranking rows, this function fetches all match entries, players and[m
+[32m+[m[32m   * matches from the database and derives per‑player maximum score,[m
+[32m+[m[32m   * minimum score and longest consecutive winning streak.  It also[m
+[32m+[m[32m   * extracts the five highest and five lowest scores across all[m
+[32m+[m[32m   * players along with the corresponding player names and match dates.[m
+[32m+[m[32m   */[m
+[32m+[m[32m  async function computeAdditionalMetrics(baseRows: DashRow[]): Promise<{[m
+[32m+[m[32m    rowsWithStats: DashRow[];[m
+[32m+[m[32m    highs: { player_name: string; points: number; match_date: string | null }[];[m
+[32m+[m[32m    lows: { player_name: string; points: number; match_date: string | null }[];[m
+[32m+[m[32m  }> {[m
+[32m+[m[32m    // Fetch all match entries.  These provide the points scored by[m
+[32m+[m[32m    // each player in each match.[m
+[32m+[m[32m    const { data: entriesData } = await supabase[m
+[32m+[m[32m      .from("match_entries")[m
+[32m+[m[32m      .select("match_id, player_id, points");[m
+[32m+[m[32m    const matchEntries = (entriesData || []) as {[m
+[32m+[m[32m      match_id: string;[m
+[32m+[m[32m      player_id: string;[m
+[32m+[m[32m      points: number;[m
+[32m+[m[32m    }[];[m
+[32m+[m
+[32m+[m[32m    // If there are no entries (no matches played yet), simply return[m
+[32m+[m[32m    // the base rows and empty top/bottom lists.[m
+[32m+[m[32m    if (matchEntries.length === 0) {[m
+[32m+[m[32m      return { rowsWithStats: baseRows, highs: [], lows: [] };[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // Fetch all players once to map player IDs to names.[m
+[32m+[m[32m    const { data: playersData } = await supabase[m
+[32m+[m[32m      .from("players")[m
+[32m+[m[32m      .select("id, name");[m
+[32m+[m[32m    const playersMap: Record<string, string> = {};[m
+[32m+[m[32m    (playersData || []).forEach((p: any) => {[m
+[32m+[m[32m      playersMap[p.id] = p.name;[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    // Fetch matches to obtain match_date and created_at.  This will[m
+[32m+[m[32m    // allow us to sort matches chronologically and attach dates to the[m
+[32m+[m[32m    // top/bottom scores.  Some matches might not have a created_at if[m
+[32m+[m[32m    // they were inserted without a timestamp; default to null.[m
+[32m+[m[32m    const { data: matchesData } = await supabase[m
+[32m+[m[32m      .from("matches")[m
+[32m+[m[32m      .select("id, match_date, created_at");[m
+[32m+[m[32m    const matchesMap: Record<[m
+[32m+[m[32m      string,[m
+[32m+[m[32m      { match_date: string | null; created_at: string | null }[m
+[32m+[m[32m    > = {};[m
+[32m+[m[32m    (matchesData || []).forEach((m: any) => {[m
+[32m+[m[32m      matchesMap[m.id] = {[m
+[32m+[m[32m        match_date: m.match_date || null,[m
+[32m+[m[32m        created_at: m.created_at || null,[m
+[32m+[m[32m      };[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    // Compute maximum and minimum points for each player.[m
+[32m+[m[32m    const maxMinMap: Record<string, { max: number; min: number }> = {};[m
+[32m+[m[32m    matchEntries.forEach((e) => {[m
+[32m+[m[32m      const pid = e.player_id;[m
+[32m+[m[32m      const pts = Number(e.points);[m
+[32m+[m[32m      if (!maxMinMap[pid]) {[m
+[32m+[m[32m        maxMinMap[pid] = { max: pts, min: pts };[m
+[32m+[m[32m      } else {[m
+[32m+[m[32m        if (pts > maxMinMap[pid].max) maxMinMap[pid].max = pts;[m
+[32m+[m[32m        if (pts < maxMinMap[pid].min) maxMinMap[pid].min = pts;[m
+[32m+[m[32m      }[m
+[32m+[m[32m    });[m
+[32m+[m
+[32m+[m[32m    // Group entries by match ID for winner determination.[m
+[32m+[m[32m    const matchGroups: Record<[m
+[32m+[m[32m      string,[m
+[32m+[m[32m      { player_id: string; points: number }[][m
+[32m+[m[32m    > = {};[m
+[32m+[m[32m    matchEntries.forEach((e) => {[m
+[32m+[m[32m      if (!matchGroups[e.match_id]) matchGroups[e.match_id] = [];[m
+[32m+[m[32m      matchGroups[e.match_id].push({ player_id: e.player_id, points: Number(e.points) });[m
+[32m+[m[32m    });[

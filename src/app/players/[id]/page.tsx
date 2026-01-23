@@ -30,6 +30,11 @@ export default function PlayerProfilePage() {
   // In Next.js app router, dynamic segments are provided as key/value pairs.
   const playerId = params?.id as string;
   const [playerName, setPlayerName] = useState<string>("");
+  // Store a variety of statistics about the player.  Additional
+  // fields track the maximum and minimum scores and the longest
+  // winning streak.  These metrics complement the existing
+  // statistics (total matches, wins, second/third places, average
+  // points, standard deviation, best/worst finish and top‑3 rate).
   const [stats, setStats] = useState({
     total: 0,
     wins: 0,
@@ -40,6 +45,9 @@ export default function PlayerProfilePage() {
     best: 0,
     worst: 0,
     top3pct: 0,
+    maxScore: 0,
+    minScore: 0,
+    winStreak: 0,
   });
   const [pointsOverTime, setPointsOverTime] = useState<{
     index: number;
@@ -83,6 +91,9 @@ export default function PlayerProfilePage() {
       let worstPlacement = 0;
       let top3Count = 0;
       const distribution: Record<number, number> = {};
+      // Prepare a groups map outside of the conditional so it can be
+      // referenced later when computing the winning streak.
+      const groups: Record<string, { player_id: string; points: number }[]> = {};
       if (matchIds.length > 0) {
         const { data: allEntriesData } = await supabase
           .from("match_entries")
@@ -94,7 +105,6 @@ export default function PlayerProfilePage() {
           points: number;
         }[];
         // Group by match.
-        const groups: Record<string, { player_id: string; points: number }[]> = {};
         allEntries.forEach((e) => {
           if (!groups[e.match_id]) groups[e.match_id] = [];
           groups[e.match_id].push(e);
@@ -141,6 +151,52 @@ export default function PlayerProfilePage() {
           .sort((a, b) => a.index - b.index);
       }
       const top3pct = totalMatches > 0 ? (top3Count / totalMatches) * 100 : 0;
+      // Compute the player's highest and lowest scores (max/min of points array).
+      const maxScore = pts.length > 0 ? Math.max(...pts) : 0;
+      const minScore = pts.length > 0 ? Math.min(...pts) : 0;
+      // Compute the longest winning streak.  A winning streak is a
+      // series of consecutive matches (in global order) where the
+      // player finishes first (ties included).  Use the match index
+      // from v_rating_history_with_order to sort matches globally.
+      let winStreak = 0;
+      if (matchIds.length > 0) {
+        // Use the previously fetched indexMap if available.  If there is
+        // no index data, the streak remains zero.
+        const indexMap: Record<string, number> = {};
+        const { data: rhData } = await supabase
+          .from("v_rating_history_with_order")
+          .select("match_id,match_index")
+          .eq("player_id", playerId);
+        (rhData || []).forEach((row: any) => {
+          indexMap[row.match_id] = row.match_index;
+        });
+        // Only consider matches where we have an index (the player might
+        // not have a rating_history entry for some older matches).
+        const orderedIds = matchIds
+          .filter((mid) => indexMap[mid] !== undefined)
+          .sort((a, b) => indexMap[a] - indexMap[b]);
+        // Determine winners per match using the groups computed above.
+        let current = 0;
+        orderedIds.forEach((mid) => {
+          const list = groups[mid] || [];
+          if (list.length === 0) return;
+          // Find the maximum points for this match.
+          let localMax = list[0].points;
+          for (const e of list) {
+            if (e.points > localMax) localMax = e.points;
+          }
+          // Determine if the player is a winner.
+          const winners = list
+            .filter((e) => Number(e.points) === Number(localMax))
+            .map((e) => e.player_id);
+          if (winners.includes(playerId)) {
+            current += 1;
+            if (current > winStreak) winStreak = current;
+          } else {
+            current = 0;
+          }
+        });
+      }
       setStats({
         total: totalMatches,
         wins,
@@ -151,6 +207,9 @@ export default function PlayerProfilePage() {
         best: bestPlacement === Number.MAX_SAFE_INTEGER ? 0 : bestPlacement,
         worst: worstPlacement,
         top3pct,
+        maxScore,
+        minScore,
+        winStreak,
       });
       setPointsOverTime(timeline);
       setPlaceDistribution(distribution);
@@ -277,6 +336,19 @@ export default function PlayerProfilePage() {
                   <td className="right">
                     {stats.avg ? (stats.std / stats.avg).toFixed(2) : "0.00"}
                   </td>
+                </tr>
+                {/* Additional player statistics: maximum score, winning streak and worst score */}
+                <tr>
+                  <td>Maior pontuação</td>
+                  <td className="right">{stats.maxScore.toFixed(1)}</td>
+                </tr>
+                <tr>
+                  <td>Maior sequência de vitórias</td>
+                  <td className="right">{stats.winStreak}</td>
+                </tr>
+                <tr>
+                  <td>Pior pontuação</td>
+                  <td className="right">{stats.minScore.toFixed(1)}</td>
                 </tr>
                 <tr>
                   <td>Melhor colocação</td>
