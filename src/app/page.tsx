@@ -483,6 +483,33 @@ export default function DashboardPage() {
         data,
       };
     });
+    // Define a custom plugin to draw numeric labels above each data point.  This
+    // plugin runs after the datasets are drawn and renders the y‑value of
+    // each point directly above the marker.  Using a plugin avoids the
+    // need for an external Chart.js plugin dependency.
+    const dataLabelPlugin = {
+      id: "dataLabelPlugin",
+      afterDatasetsDraw(chart: any) {
+        const { ctx } = chart;
+        ctx.save();
+        chart.data.datasets.forEach((dataset: any, datasetIndex: number) => {
+          const meta = chart.getDatasetMeta(datasetIndex);
+          meta.data.forEach((element: any, index: number) => {
+            const dp = dataset.data[index];
+            if (!dp) return;
+            // The data point may be an object with x/y properties or a simple number
+            const value = typeof dp === "object" && dp !== null ? dp.y : dp;
+            const position = element.tooltipPosition();
+            ctx.fillStyle = "#e9eefc";
+            ctx.font = "10px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText(Math.round(value).toString(), position.x, position.y - 6);
+          });
+        });
+        ctx.restore();
+      },
+    };
     chartRef.current = new Chart(canvas, {
       type: "line",
       data: {
@@ -521,6 +548,7 @@ export default function DashboardPage() {
           },
         },
       },
+      plugins: [dataLabelPlugin],
     });
   }, [history, rows, selectedPlayers]);
 
@@ -601,8 +629,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Grid with ranking table and extreme score lists */}
-      <div className="grid">
+      {/* Grid with ranking table.  Override the column layout to a single column since the score lists are moved elsewhere. */}
+      <div className="grid" style={{ gridTemplateColumns: "1fr" }}>
         {/* Ranking table card */}
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Ranking</h3>
@@ -639,16 +667,17 @@ export default function DashboardPage() {
                     {i + 1}
                   </td>
                   <td>
-                    <a href={`/players/${r.player_id}`} style={{ color: "#e9eefc", textDecoration: "none" }}>{r.name}</a>
+                    {/* Make player name a styled button‑like link to emphasise profile access */}
+                    <a href={`/players/${r.player_id}`} className="profile-link">{r.name}</a>
                   </td>
-                    <td className="right">{r.wins ?? 0}</td>
+                  <td className="right">{r.wins ?? 0}</td>
                   <td className="right"><b>{Math.round(r.rating)}</b></td>
                   <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
-                  <td className="right">{Number(r.avg_points).toFixed(1)}</td>
+                  <td className="right">{Math.round(Number(r.avg_points))}</td>
                   <td className="right">{r.games}</td>
-                  <td className="right">{r.max_score !== undefined ? r.max_score.toFixed(1) : "-"}</td>
+                  <td className="right">{r.max_score !== undefined ? Math.round(r.max_score) : "-"}</td>
                   <td className="right">{r.win_streak ?? 0}</td>
-                  <td className="right">{r.min_score !== undefined ? r.min_score.toFixed(1) : "-"}</td>
+                  <td className="right">{r.min_score !== undefined ? Math.round(r.min_score) : "-"}</td>
                   <td className="right">
                     {r.delta_last_10 > 0 && <span style={{ color: "#4caf50" }}>▲ {Number(r.delta_last_10).toFixed(1)}</span>}
                     {r.delta_last_10 < 0 && <span style={{ color: "#e75a5a" }}>▼ {Number(r.delta_last_10).toFixed(1)}</span>}
@@ -659,37 +688,7 @@ export default function DashboardPage() {
             </tbody>
           </table>
         </div>
-        {/* Card containing top and bottom score lists */}
-        <div className="card">
-          {/* Only show lists when data has been computed */}
-          {topScores.length > 0 && lowScores.length > 0 && (
-            <div className="score-list-container" style={{ marginTop: 0 }}>
-              <div className="score-card">
-                {/* Green emoji and green text for top scores */}
-                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
-                <ul className="score-list">
-                  {topScores.map((s, idx) => (
-                    <li key={idx} className="score-item">
-                      <span className="score-player" style={{ color: "#4caf50" }}>{s.player_name}</span>
-                      <span className="score-points" style={{ color: "#4caf50" }}>{s.points.toFixed(1)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="score-card">
-                <div className="score-card-header">❄️ 5 Menores Pontuações</div>
-                <ul className="score-list">
-                  {lowScores.map((s, idx) => (
-                    <li key={idx} className="score-item">
-                      <span className="score-player">{s.player_name}</span>
-                      <span className="score-points">{s.points.toFixed(1)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
+        {/* End of grid columns.  The second column has been removed; the score lists are moved into the wins distribution card. */}
       </div>
 
       {/* Charts column: rating evolution on top of wins distribution.  The two charts share the same width to align visually. */}
@@ -716,6 +715,35 @@ export default function DashboardPage() {
           <div>
             <canvas id="winsChart" height={160} />
           </div>
+          {/* Display the Top 5 and 5 lowest scores stacked underneath the chart.  The top list remains green and the bottom list inherits the same colour as its numbers (blue). */}
+          {topScores.length > 0 && lowScores.length > 0 && (
+            <div className="score-list-container" style={{ flexDirection: "column", marginTop: 16 }}>
+              {/* Top scores list */}
+              <div className="score-card">
+                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
+                <ul className="score-list">
+                  {topScores.map((s, idx) => (
+                    <li key={idx} className="score-item">
+                      <span className="score-player" style={{ color: "#4caf50" }}>{s.player_name}</span>
+                      <span className="score-points" style={{ color: "#4caf50" }}>{s.points.toFixed(1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              {/* Bottom scores list with unified colour */}
+              <div className="score-card">
+                <div className="score-card-header" style={{ color: "#4ea1ff" }}>❄️ 5 Menores Pontuações</div>
+                <ul className="score-list">
+                  {lowScores.map((s, idx) => (
+                    <li key={idx} className="score-item">
+                      <span className="score-player" style={{ color: "#4ea1ff" }}>{s.player_name}</span>
+                      <span className="score-points" style={{ color: "#4ea1ff" }}>{s.points.toFixed(1)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
