@@ -52,6 +52,16 @@ export default function DashboardPage() {
     { player_name: string; points: number; match_date: string | null }[]
   >([]);
 
+  // Summary metrics shown at the top of the dashboard.  Each field
+  // contains the player name and the corresponding value.  The top
+  // player includes a diff (rating difference to the next player).
+  const [summary, setSummary] = useState({
+    topPlayer: { name: "", rating: 0, diff: 0 },
+    bestImprovement: { name: "", value: 0 },
+    worstDecline: { name: "", value: 0 },
+    activeStreak: { name: "", value: 0 },
+  });
+
   // Load ranking data
   async function loadDashboard() {
     const { data, error } = await supabase
@@ -69,11 +79,15 @@ export default function DashboardPage() {
       // Preselect the top 5 players for the rating chart.
       setSelectedPlayers(baseRows.slice(0, 5).map((d) => d.player_id));
       // Compute additional metrics for each player and the global top/bottom scores.
-      computeAdditionalMetrics(baseRows).then(({ rowsWithStats, highs, lows }) => {
-        setRows(rowsWithStats);
-        setTopScores(highs);
-        setLowScores(lows);
-      });
+      computeAdditionalMetrics(baseRows).then(
+        ({ rowsWithStats, highs, lows, currentStreakMap }) => {
+          setRows(rowsWithStats);
+          setTopScores(highs);
+          setLowScores(lows);
+          // After computing row-level stats, derive summary metrics.
+          computeSummaryMetrics(rowsWithStats, currentStreakMap);
+        },
+      );
     }
   }
 
@@ -101,6 +115,59 @@ export default function DashboardPage() {
   }, [selectedPlayers]);
 
   /**
+   * Compute high-level summary metrics for the dashboard.  These include
+   * the top player (by rating) and their rating difference to the
+   * runner‑up, the player with the largest positive delta over the last
+   * 10 matches, the player with the largest negative delta and the
+   * player with the longest currently active winning streak.  The
+   * metrics are derived from the dashboard rows and the map of
+   * current streaks produced by computeAdditionalMetrics().
+   */
+  function computeSummaryMetrics(
+    rowsWithStats: DashRow[],
+    currentStreakMap: Record<string, number>,
+  ) {
+    if (rowsWithStats.length === 0) return;
+    // Top player by rating and difference to next player.
+    const sortedByRating = [...rowsWithStats].sort(
+      (a, b) => Number(b.rating) - Number(a.rating),
+    );
+    const top = sortedByRating[0];
+    const second = sortedByRating[1];
+    const diff = second
+      ? Math.round(Number(top.rating) - Number(second.rating))
+      : Math.round(Number(top.rating));
+    // Player with the greatest improvement (largest positive delta_last_10)
+    let best = top;
+    let worst = top;
+    for (const row of rowsWithStats) {
+      if (row.delta_last_10 > best.delta_last_10) {
+        best = row;
+      }
+      if (row.delta_last_10 < worst.delta_last_10) {
+        worst = row;
+      }
+    }
+    // Player with longest active win streak
+    let streakPid = top.player_id;
+    let streakVal = 0;
+    for (const pid in currentStreakMap) {
+      const val = currentStreakMap[pid];
+      if (val > streakVal) {
+        streakVal = val;
+        streakPid = pid;
+      }
+    }
+    const streakPlayerRow = rowsWithStats.find((r) => r.player_id === streakPid);
+    setSummary({
+      topPlayer: { name: top.name, rating: top.rating, diff },
+      bestImprovement: { name: best.name, value: Number(best.delta_last_10) },
+      worstDecline: { name: worst.name, value: Number(worst.delta_last_10) },
+      activeStreak: { name: streakPlayerRow?.name || streakPid, value: streakVal },
+    });
+  }
+
+  /**
    * Compute additional statistics for the dashboard.  Given the base
    * ranking rows, this function fetches all match entries, players and
    * matches from the database and derives per‑player maximum score,
@@ -112,6 +179,7 @@ export default function DashboardPage() {
     rowsWithStats: DashRow[];
     highs: { player_name: string; points: number; match_date: string | null }[];
     lows: { player_name: string; points: number; match_date: string | null }[];
+    currentStreakMap: Record<string, number>;
   }> {
     // Fetch all match entries.  These provide the points scored by
     // each player in each match.
@@ -125,9 +193,14 @@ export default function DashboardPage() {
     }[];
 
     // If there are no entries (no matches played yet), simply return
-    // the base rows and empty top/bottom lists.
+    // the base rows and empty top/bottom lists and an empty streak map.
     if (matchEntries.length === 0) {
-      return { rowsWithStats: baseRows, highs: [], lows: [] };
+      return {
+        rowsWithStats: baseRows,
+        highs: [],
+        lows: [],
+        currentStreakMap: {},
+      };
     }
 
     // Fetch all players once to map player IDs to names.
@@ -268,7 +341,11 @@ export default function DashboardPage() {
         win_streak: winStreakMap[row.player_id] ?? 0,
       };
     });
-    return { rowsWithStats, highs, lows };
+    // Capture the current streak map so that the UI can compute active
+    // win streaks across players.  Spread to avoid exposing the
+    // internal reference.
+    const currentStreakMap = { ...currentStreak };
+    return { rowsWithStats, highs, lows, currentStreakMap };
   }
 
   // Rebuild the chart when history or selected players change
@@ -352,6 +429,56 @@ export default function DashboardPage() {
           <a href="/admin" className="muted">
             Admin
           </a>
+        </div>
+      </div>
+
+      {/* Summary cards showing high-level metrics.  These cards mirror the
+          visual aesthetic of the provided design by using icons,
+          dark backgrounds and coloured highlights. */}
+      <div className="summary-grid" style={{ marginBottom: 24 }}>
+        <div className="summary-card top-player">
+          <div className="summary-icon">🏆</div>
+          <div className="summary-content">
+            <div className="summary-title">Top Player</div>
+            <div className="summary-player-name">{summary.topPlayer.name || "-"}</div>
+            <div className="summary-number">{Math.round(summary.topPlayer.rating || 0)}</div>
+            <div className="summary-delta" style={{ color: "#4ea1ff" }}>
+              {summary.topPlayer.diff >= 0 ? "+" : ""}
+              {summary.topPlayer.diff}
+            </div>
+          </div>
+        </div>
+        <div className="summary-card improvement">
+          <div className="summary-icon">📈</div>
+          <div className="summary-content">
+            <div className="summary-title">Maior Evolução</div>
+            <div className="summary-player-name">{summary.bestImprovement.name || "-"}</div>
+            <div className="summary-number" style={{ color: "#4caf50" }}>
+              {summary.bestImprovement.value >= 0 ? "+" : ""}
+              {summary.bestImprovement.value.toFixed(1)}
+            </div>
+          </div>
+        </div>
+        <div className="summary-card decline">
+          <div className="summary-icon">📉</div>
+          <div className="summary-content">
+            <div className="summary-title">Maior Queda</div>
+            <div className="summary-player-name">{summary.worstDecline.name || "-"}</div>
+            <div className="summary-number" style={{ color: "#e75a5a" }}>
+              {summary.worstDecline.value >= 0 ? "+" : ""}
+              {summary.worstDecline.value.toFixed(1)}
+            </div>
+          </div>
+        </div>
+        <div className="summary-card streak">
+          <div className="summary-icon">🏅</div>
+          <div className="summary-content">
+            <div className="summary-title">Maior Streak Ativa</div>
+            <div className="summary-player-name">{summary.activeStreak.name || "-"}</div>
+            <div className="summary-number" style={{ color: "#f0ad4e" }}>
+              {summary.activeStreak.value}
+            </div>
+          </div>
         </div>
       </div>
 
