@@ -258,4 +258,22 @@ th {
   color: #4ea1ff;
 }
 
+/* Profile link styling: make player names in the ranking table look like clickable buttons */
+.profile-link {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #2b7cff;
+  border: 1px solid #4ea1ff;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease;
+}
+
+.profile-link:hover {
+  background: #1f60c8;
+}
+
 /* Adjust arrow colours for delta values by default; override in inline styles in component. */
