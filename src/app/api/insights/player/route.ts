@@ -10,7 +10,7 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import openai from '@/lib/openai';
+import openai from '../../../../lib/openai';
 
 // Initialise a Supabase client using a service role key.  The service
 // role key allows read access to views like v_dashboard_players and
