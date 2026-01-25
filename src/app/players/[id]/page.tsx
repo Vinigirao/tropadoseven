@@ -1,6 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+// Import the AI-powered insights component.  This component will
+// fetch a summary of the player's performance via our new API route
+// and display it alongside the existing statistics.
+// Use a relative import because the project does not configure a baseUrl
+// alias for the @ prefix.  Relative path traverses back to the src
+// folder and into the components directory.
+import PlayerInsights from '../../../components/PlayerInsights';
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
 import Chart from "chart.js/auto";
@@ -373,6 +380,17 @@ export default function PlayerProfilePage() {
       <div className="card" style={{ marginTop: 16 }}>
         <h3 style={{ marginTop: 0 }}>Distribuição de Colocações</h3>
         <canvas id="placementChart" height={180} />
+      </div>
+
+      {/* AI-powered summary for the player.  This card calls the
+          PlayerInsights component which fetches a natural‑language
+          summary and key statistics from the OpenAI API via the
+          /api/insights/player endpoint.  Placing it at the bottom
+          keeps the existing charts intact while offering an
+          additional narrative explanation. */}
+      <div className="card" style={{ marginTop: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Resumo do Jogador (IA)</h3>
+        <PlayerInsights playerId={playerId} />
       </div>
     </div>
   );
