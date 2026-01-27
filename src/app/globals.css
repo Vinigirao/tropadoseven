@@ -57,6 +57,12 @@ button.primary {
   border-color: #4ea1ff;
 }
 
+/* Secondary button style used on the admin page for cancelling edits. */
+button.secondary {
+  background: #0d152a;
+  border-color: #233152;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -71,6 +77,30 @@ td {
   font-size: 12px;
   border-bottom: 1px solid #233152;
   text-align: left;
+}
+
+/* Zebra striping for table rows to improve readability on dark backgrounds. */
+tbody tr:nth-child(odd) {
+  background: #0e1a33;
+}
+
+/* Highlight top ranking rows and the last row with subtle background colours */
+tbody tr.top-one {
+  background: #16284d;
+  font-weight: 600;
+}
+
+tbody tr.top-two {
+  background: #142449;
+}
+
+tbody tr.top-three {
+  background: #112040;
+}
+
+tbody tr.bottom {
+  background: #331625;
+  color: #e75a5a;
 }
 
 th {
@@ -92,3 +122,179 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+/* Summary grid for high-level metrics on the dashboard.  Cards adjust
+   responsively to the available width. */
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+/* Base styling for summary cards.  They share the same dark
+   background and border as other cards but are more compact and
+   flex-based for icon alignment. */
+.summary-card {
+  display: flex;
+  align-items: center;
+  background: #121b2e;
+  border: 1px solid #233152;
+  border-radius: 14px;
+  padding: 12px;
+  min-height: 80px;
+  color: #e9eefc;
+}
+
+.summary-icon {
+  font-size: 28px;
+  margin-right: 12px;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-title {
+  font-size: 12px;
+  color: #93a4c7;
+  margin-bottom: 2px;
+}
+
+.summary-player-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e9eefc;
+}
+
+.summary-number {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+/* Call‑to‑action links used for the "Comparar jogadores" and "Admin" buttons. */
+.cta-button {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 12px;
+  background: #2b7cff;
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #4ea1ff;
+  transition: background 0.2s ease;
+}
+
+.cta-button:hover {
+  background: #1f60c8;
+}
+
+/* Secondary variant of CTA button, used for the Admin link. */
+.cta-button.secondary {
+  background: #eeb26f;
+  border-color: #f0c88d;
+  color: #0b1220;
+}
+
+.cta-button.secondary:hover {
+  background: #d89a55;
+}
+
+/* Styling for the last‑place summary card.  Uses a reddish accent to
+   draw attention and a playful tone. */
+.summary-card.last-place {
+  background: #2b1523;
+  border-color: #742d44;
+}
+
+.summary-delta {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Score list styling for top/bottom scores on the dashboard.  These
+   lists are displayed in small cards adjacent to the rating chart. */
+.score-list-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.score-card {
+  background: #121b2e;
+  border: 1px solid #233152;
+  border-radius: 14px;
+  padding: 12px;
+  min-width: 160px;
+  flex: 1;
+  color: #e9eefc;
+}
+
+.score-card-header {
+  font-weight: 700;
+  margin-bottom: 8px;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Container for stacking charts vertically.  Ensures rating and win charts
+   share the same width and spacing. */
+.charts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.score-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.score-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #233152;
+  font-size: 13px;
+}
+
+.score-item:last-child {
+  border-bottom: none;
+}
+
+.score-player {
+  color: #e9eefc;
+}
+
+.score-points {
+  font-weight: 700;
+  color: #4ea1ff;
+}
+
+/* Profile link styling: make player names in the ranking table look like clickable buttons */
+.profile-link {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #2b7cff;
+  border: 1px solid #4ea1ff;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.2s ease;
+  box-shadow: 0 0 4px rgba(46, 75, 129, 0.6);
+}
+
+.profile-link:hover {
+  background: #1f60c8;
+  box-shadow: 0 0 6px rgba(46, 75, 129, 0.9);
+}
+
+/* Adjust arrow colours for delta values by default; override in inline styles in component. */
