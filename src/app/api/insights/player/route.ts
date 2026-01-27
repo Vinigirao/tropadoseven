@@ -10,7 +10,8 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import openai from '../../../../lib/openai';
+// Import the free AI helper instead of OpenAI.
+import { generateText } from '../../../../lib/free_ai';
 
 // Initialise a Supabase client using a service role key.  The service
 // role key allows read access to views like v_dashboard_players and
@@ -75,17 +76,16 @@ export async function POST(request: Request) {
       `Dados do jogador (JSON): ${JSON.stringify(stats)}\n` +
       `Histórico de rating (últimas ${history?.length ?? 0} partidas, JSON): ${JSON.stringify(history)}\n\n` +
       `Com base nesses dados, escreva um resumo em português do desempenho do jogador: destaque pontos médios, porcentagem de vitórias, tendência recente do rating e qualquer melhora ou queda significativa. ` +
-      `Compare com a média dos outros jogadores quando possível. Não invente números que não estejam nos dados. Retorne apenas o texto do resumo, sem colunas de JSON.`;
-
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
+      `Compare com a média dos outros jogadores quando possível. Não invente números que não estejam nos dados. Retorne apenas o texto do resumo, sem colunas de JSON.` +
+      'Seja da zoeira, fale diretamente com o player humilhe ele se for o caso. ou vanglorize muitos jogadores.' +
+      'humilhe de verdade o player ' +
+      'escreva no maximo 1 paragrafo curto e engraçado.';
+    // Generate the summary using the free AI helper.  The helper
+    // returns a trimmed string and handles API interaction and errors.
+    const summary = await generateText(prompt, {
+      maxTokens: 400,
       temperature: 0.2,
     });
-
-    const summary = completion.choices?.[0]?.message?.content?.trim() ?? '';
-
     return NextResponse.json({
       summary,
       stats,

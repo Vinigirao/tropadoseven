@@ -8,7 +8,9 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import openai from '../../../../lib/openai';
+// Import the free AI helper instead of OpenAI.  This module
+// encapsulates calls to the Hugging Face Inference API.
+import { generateText } from '../../../../lib/free_ai';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -119,14 +121,22 @@ export async function POST(request: Request) {
       `E os resultados das partidas (data, pontuação máxima e vencedores): ${JSON.stringify(matchResults)}.\n\n` +
       `Escreva um relatório em português que destaque quem se destacou, quem teve maior variação positiva ou negativa de rating, ` +
       `e qualquer tendência interessante (por exemplo, jogadores em alta ou em baixa). Compare médias de pontos e percentuais de vitória. ` +
-      `Não invente números que não estão nos dados. Use uma linguagem amigável e objetiva.`;
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 400,
+      `Não invente números que não estão nos dados. Use uma linguagem amigável e objetiva.\n` +
+      `Envie apenas texto simples, sem formatação ou tabelas\n no maximo 20 linhas mas finalize a logica` +
+      `Seja da zoeira maxima, humilhe os players com mal desempenho, fale coisas do tipo "Vc precisa treinar mais hein meu parceiro" ou "Vc é um fracassado" ou "Vc ta na merda" ou "fulano devia ta muito louco na ultima partida"` +
+      `humilhe de verdade os players\n` +
+      `Seja engraçado e criativo ao escrever o relatório.\n` +
+      'vanglorize os melhores elogie destaques e use um tom descontraído.' +
+      'Use apenas texto simples, sem formatação ou tabelas. nao traga a tabela Jogadores em Destaque e Últimas partidas' +
+      'NAO FACA INTRODUÇÂO NEM CONCLUSÃO, VÁ DIRETO AO PONTO.';
+
+    
+    // Generate the summary using the free AI helper.  The helper
+    // returns a trimmed string and handles API interaction and errors.
+    const summary = await generateText(prompt, {
+      maxTokens: 400,
       temperature: 0.2,
     });
-    const summary = completion.choices?.[0]?.message?.content?.trim() ?? '';
     return NextResponse.json({ summary, players: playerSummaries, matches: matchResults });
   } catch (err: any) {
     console.error(err);
