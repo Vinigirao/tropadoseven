@@ -126,9 +126,10 @@ export async function POST(request: Request) {
       `Seja da zoeira maxima, humilhe os players com mal desempenho, fale coisas do tipo "Vc precisa treinar mais hein meu parceiro" ou "Vc é um fracassado" ou "Vc ta na merda" ou "fulano devia ta muito louco na ultima partida"` +
       `humilhe de verdade os players\n` +
       `Seja engraçado e criativo ao escrever o relatório.\n` +
-      'vanglorize os melhores elogie destaques e use um tom descontraído.' +
+      'vanglorize os melhores elogie destaques e use um tom descontraído.\n' +
       'Use apenas texto simples, sem formatação ou tabelas. nao traga a tabela Jogadores em Destaque e Últimas partidas' +
-      'NAO FACA INTRODUÇÂO NEM CONCLUSÃO, VÁ DIRETO AO PONTO.';
+      'NAO FACA INTRODUÇÂO NEM CONCLUSÃO, VÁ DIRETO AO PONTO.\n' +
+      'não traga a somatoria de pontos e sim as medias de pontos das ultimas x partidas' ;
 
     
     // Generate the summary using the free AI helper.  The helper
