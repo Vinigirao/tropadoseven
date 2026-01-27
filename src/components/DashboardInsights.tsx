@@ -69,7 +69,7 @@ export default function DashboardInsights({ recentMatches = 10 }: Props) {
   return (
     <div className="dashboard-insights">
       {summary && <p className="dashboard-summary" style={{ whiteSpace: 'pre-wrap' }}>{summary}</p>}
-      {players.length > 0 && (
+      {/* {players.length > 0 && (
         <div>
           <h3>Jogadores em Destaque</h3>
           <table>
@@ -93,8 +93,8 @@ export default function DashboardInsights({ recentMatches = 10 }: Props) {
             </tbody>
           </table>
         </div>
-      )}
-      {matches.length > 0 && (
+      )} */}
+      {/* {matches.length > 0 && (
         <div style={{ marginTop: '1rem' }}>
           <h3>Últimas partidas</h3>
           <table>
@@ -116,7 +116,7 @@ export default function DashboardInsights({ recentMatches = 10 }: Props) {
             </tbody>
           </table>
         </div>
-      )}
+      )} */}
     </div>
   );
 }

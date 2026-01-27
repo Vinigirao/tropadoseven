@@ -1,61 +1,74 @@
-import type { RequestInit } from 'next/dist/server/types';
-
 /**
- * Helper to generate a completion using a free AI provider.
+ * Free AI helper using Hugging Face Router (Inference Providers).
  *
- * This implementation uses the Hugging Face Inference API to call
- * a chat/instruction-tuned model.  You must set the environment
- * variable `HF_API_TOKEN` to a valid Hugging Face API token.  You can
- * optionally set `HF_MODEL_ID` to choose a specific model; if not
- * defined, a sensible default will be used.
+ * Env:
+ * - HF_API_TOKEN (required): Hugging Face token with "Inference Providers" permission
+ * - HF_MODEL_ID (optional): model id on HF Hub (default below)
  *
- * The returned text is trimmed and free of surrounding whitespace.
+ * Uses OpenAI-compatible endpoint:
+ * - POST https://router.huggingface.co/v1/chat/completions
  */
-export async function generateText(
-  prompt: string,
-  {
-    maxTokens = 400,
-    temperature = 0.2,
-  }: { maxTokens?: number; temperature?: number } = {},
-): Promise<string> {
-  const apiToken = process.env.HF_API_TOKEN;
-  if (!apiToken) {
-    throw new Error('HF_API_TOKEN is not defined. Please add it to your environment variables.');
+export type GenerateTextOptions = {
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+};
+
+const DEFAULT_MODEL = "meta-llama/Llama-3.1-8B-Instruct";
+const HF_ROUTER_URL = "https://router.huggingface.co/v1/chat/completions";
+
+function redact(s: string) {
+  return s.replace(/hf_[A-Za-z0-9]+/g, "hf_***");
+}
+
+export async function generateText(prompt: string, opts: GenerateTextOptions = {}) {
+  const token = process.env.HF_API_TOKEN;
+  const model = process.env.HF_MODEL_ID || DEFAULT_MODEL;
+
+  if (!token) {
+    throw new Error(
+      "HF_API_TOKEN não configurado. Crie um token na Hugging Face com permissão 'Inference Providers' e defina em HF_API_TOKEN."
+    );
   }
-  const modelId =
-    process.env.HF_MODEL_ID || 'mistralai/Mistral-7B-Instruct-v0.1';
-  const url = `https://api-inference.huggingface.co/models/${modelId}`;
+
   const body = {
-    inputs: prompt,
-    parameters: {
-      max_new_tokens: maxTokens,
-      temperature,
-    },
+    model,
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: opts.maxTokens ?? 400,
+    temperature: opts.temperature ?? 0.2,
   };
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  } as RequestInit);
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`Hugging Face API responded with status ${res.status}: ${text}`);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 60_000);
+
+  try {
+    const res = await fetch(HF_ROUTER_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+
+    const text = await res.text();
+    if (!res.ok) {
+      throw new Error(
+        `Hugging Face Router respondeu ${res.status}: ${redact(text)}`
+      );
+    }
+
+    // OpenAI-compatible response
+    const json = JSON.parse(text) as any;
+    const content = json?.choices?.[0]?.message?.content?.trim?.() ?? "";
+    return content;
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new Error("Timeout ao chamar o Hugging Face Router");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
   }
-  const data = await res.json();
-  /**
-   * The HF inference API may return either an array of objects with
-   * `generated_text` or a single object with the text.  Normalise to
-   * a string.
-   */
-  let generated = '';
-  if (Array.isArray(data) && data.length > 0) {
-    const candidate = data[0] as any;
-    generated = candidate?.generated_text ?? '';
-  } else if (data && typeof (data as any).generated_text === 'string') {
-    generated = (data as any).generated_text;
-  }
-  return (generated ?? '').trim();
 }

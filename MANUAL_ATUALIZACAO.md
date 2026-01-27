@@ -51,8 +51,7 @@ Os arquivos `src/app/api/insights/general/route.ts` e `src/app/api/insights/play
 A assinatura da função é:
 
 ```ts
-// Importação relativa do helper de IA gratuito
-import { generateText } from '../../../../lib/free_ai';
+import { generateText } from '@/lib/free_ai';
 
 const resumo = await generateText(prompt, {
   maxTokens: 400,      // número máximo de tokens na resposta
