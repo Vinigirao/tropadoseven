@@ -1,4 +1,4 @@
-import type { RequestInit } from 'next/dist/server/types';
+// import type { RequestInit } from 'next/dist/server/types';
 
 /**
  * Helper to generate a completion using a free AI provider.
