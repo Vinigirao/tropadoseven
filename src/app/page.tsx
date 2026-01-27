@@ -3,6 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Chart from "chart.js/auto";
+// Import the AI-driven dashboard insights component.  This component
+// summarises recent matches across all players using OpenAI and will
+// be displayed below the existing charts.
+// Use a relative import because the project does not configure a baseUrl
+// alias for the @ prefix.  Navigate up one level to src and then to
+// components.
+import DashboardInsights from '../components/DashboardInsights';
 
 // Extend the dashboard row type to include additional statistics for
 // maximum score, minimum score and longest winning streak.  These
@@ -753,6 +760,16 @@ export default function DashboardPage() {
             <canvas id="winsChart" height={160} />
           </div>
         </div>
+      </div>
+
+      {/* AI-powered general dashboard summary.  This card uses the
+          DashboardInsights component to fetch a natural‑language
+          summary of recent matches and player performance.  It is
+          positioned below the charts to complement the visual data
+          with a narrative report. */}
+      <div className="card" style={{ marginTop: 24 }}>
+        <h3 style={{ marginTop: 0 }}>Resumo das Últimas Partidas (IA)</h3>
+        <DashboardInsights recentMatches={10} />
       </div>
     </div>
   );
