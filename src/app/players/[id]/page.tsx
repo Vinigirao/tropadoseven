@@ -140,8 +140,7 @@ export default function PlayerProfilePage() {
           }
         });
       }
-      // Compute points over time.  Use the global match_index so the
-      // horizontal axis represents the order of matches globally.
+      // Compute points over time.  Use the global match_index so the horizontal axis represents the order of matches globally.
       let timeline: { index: number; points: number }[] = [];
       if (matchIds.length > 0) {
         const { data: rhData } = await supabase
@@ -161,14 +160,10 @@ export default function PlayerProfilePage() {
       // Compute the player's highest and lowest scores (max/min of points array).
       const maxScore = pts.length > 0 ? Math.max(...pts) : 0;
       const minScore = pts.length > 0 ? Math.min(...pts) : 0;
-      // Compute the longest winning streak.  A winning streak is a
-      // series of consecutive matches (in global order) where the
-      // player finishes first (ties included).  Use the match index
-      // from v_rating_history_with_order to sort matches globally.
+      // Compute the longest winning streak.  A winning streak is a series of consecutive matches (in global order) where the player finishes first (ties included).  Use the match index from v_rating_history_with_order to sort matches globally.
       let winStreak = 0;
       if (matchIds.length > 0) {
-        // Use the previously fetched indexMap if available.  If there is
-        // no index data, the streak remains zero.
+        // Use the previously fetched indexMap if available.  If there is no index data, the streak remains zero.
         const indexMap: Record<string, number> = {};
         const { data: rhData } = await supabase
           .from("v_rating_history_with_order")
@@ -177,8 +172,7 @@ export default function PlayerProfilePage() {
         (rhData || []).forEach((row: any) => {
           indexMap[row.match_id] = row.match_index;
         });
-        // Only consider matches where we have an index (the player might
-        // not have a rating_history entry for some older matches).
+        // Only consider matches where we have an index (the player might not have a rating_history entry for some older matches).
         const orderedIds = matchIds
           .filter((mid) => indexMap[mid] !== undefined)
           .sort((a, b) => indexMap[a] - indexMap[b]);
@@ -309,6 +303,12 @@ export default function PlayerProfilePage() {
           Voltar ao Dashboard
         </a>
       </div>
+      {/* AI-powered summary for the player moved above the statistics so that
+          the narrative overview precedes the numeric tables and charts. */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h3 style={{ marginTop: 0 }}>Resumo do Jogador (IA)</h3>
+        <PlayerInsights playerId={playerId} />
+      </div>
       <div className="grid">
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Estatísticas</h3>
@@ -326,49 +326,49 @@ export default function PlayerProfilePage() {
                 <td>Total em 2º lugar</td>
                 <td className="right">{stats.seconds}</td>
               </tr>
-                <tr>
-                  <td>Total em 3º lugar</td>
-                  <td className="right">{stats.thirds}</td>
-                </tr>
-                <tr>
-                  <td>Média de pontos</td>
-                  <td className="right">{stats.avg.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td>Desvio padrão de pontos</td>
-                  <td className="right">{stats.std.toFixed(2)}</td>
-                </tr>
-                <tr>
-                  <td>Consistência (std/avg)</td>
-                  <td className="right">
-                    {stats.avg ? (stats.std / stats.avg).toFixed(2) : "0.00"}
-                  </td>
-                </tr>
-                {/* Additional player statistics: maximum score, winning streak and worst score */}
-                <tr>
-                  <td>Maior pontuação</td>
-                  <td className="right">{stats.maxScore.toFixed(1)}</td>
-                </tr>
-                <tr>
-                  <td>Maior sequência de vitórias</td>
-                  <td className="right">{stats.winStreak}</td>
-                </tr>
-                <tr>
-                  <td>Pior pontuação</td>
-                  <td className="right">{stats.minScore.toFixed(1)}</td>
-                </tr>
-                <tr>
-                  <td>Melhor colocação</td>
-                  <td className="right">{stats.best === 0 ? "-" : stats.best}</td>
-                </tr>
-                <tr>
-                  <td>Pior colocação</td>
-                  <td className="right">{stats.worst}</td>
-                </tr>
-                <tr>
-                  <td>% Top 3</td>
-                  <td className="right">{stats.top3pct.toFixed(1)}%</td>
-                </tr>
+              <tr>
+                <td>Total em 3º lugar</td>
+                <td className="right">{stats.thirds}</td>
+              </tr>
+              <tr>
+                <td>Média de pontos</td>
+                <td className="right">{stats.avg.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td>Desvio padrão de pontos</td>
+                <td className="right">{stats.std.toFixed(2)}</td>
+              </tr>
+              <tr>
+                <td>Consistência (std/avg)</td>
+                <td className="right">
+                  {stats.avg ? (stats.std / stats.avg).toFixed(2) : "0.00"}
+                </td>
+              </tr>
+              {/* Additional player statistics: maximum score, winning streak and worst score */}
+              <tr>
+                <td>Maior pontuação</td>
+                <td className="right">{stats.maxScore.toFixed(1)}</td>
+              </tr>
+              <tr>
+                <td>Maior sequência de vitórias</td>
+                <td className="right">{stats.winStreak}</td>
+              </tr>
+              <tr>
+                <td>Pior pontuação</td>
+                <td className="right">{stats.minScore.toFixed(1)}</td>
+              </tr>
+              <tr>
+                <td>Melhor colocação</td>
+                <td className="right">{stats.best === 0 ? "-" : stats.best}</td>
+              </tr>
+              <tr>
+                <td>Pior colocação</td>
+                <td className="right">{stats.worst}</td>
+              </tr>
+              <tr>
+                <td>% Top 3</td>
+                <td className="right">{stats.top3pct.toFixed(1)}%</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -380,17 +380,6 @@ export default function PlayerProfilePage() {
       <div className="card" style={{ marginTop: 16 }}>
         <h3 style={{ marginTop: 0 }}>Distribuição de Colocações</h3>
         <canvas id="placementChart" height={180} />
-      </div>
-
-      {/* AI-powered summary for the player.  This card calls the
-          PlayerInsights component which fetches a natural‑language
-          summary and key statistics from the OpenAI API via the
-          /api/insights/player endpoint.  Placing it at the bottom
-          keeps the existing charts intact while offering an
-          additional narrative explanation. */}
-      <div className="card" style={{ marginTop: 16 }}>
-        <h3 style={{ marginTop: 0 }}>Resumo do Jogador (IA)</h3>
-        <PlayerInsights playerId={playerId} />
       </div>
     </div>
   );

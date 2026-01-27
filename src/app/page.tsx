@@ -98,7 +98,8 @@ export default function DashboardPage() {
       }));
       // Preselect the top 5 players for the rating chart.
       setSelectedPlayers(baseRows.slice(0, 5).map((d) => d.player_id));
-      // Compute additional metrics for each player and the global top/bottom scores.
+      // Compute additional metrics for each player and the global 
+      // top/bottom scores.
       computeAdditionalMetrics(baseRows).then(
         ({ rowsWithStats, highs, lows, currentStreakMap }) => {
           setRows(rowsWithStats);
@@ -148,9 +149,7 @@ export default function DashboardPage() {
     }
     // Sort players by number of wins in descending order to make the
     // distribution easier to read.  Ties maintain their relative order.
-    const sortedRows = [...rows].sort(
-      (a, b) => (b.wins ?? 0) - (a.wins ?? 0),
-    );
+    const sortedRows = [...rows].sort((a, b) => (b.wins ?? 0) - (a.wins ?? 0));
     const labels = sortedRows.map((r) => r.name);
     const dataPoints = sortedRows.map((r) => r.wins ?? 0);
     winsChartRef.current = new Chart(canvas, {
@@ -224,9 +223,7 @@ export default function DashboardPage() {
   ) {
     if (rowsWithStats.length === 0) return;
     // Top player by rating and difference to next player.
-    const sortedByRating = [...rowsWithStats].sort(
-      (a, b) => Number(b.rating) - Number(a.rating),
-    );
+    const sortedByRating = [...rowsWithStats].sort((a, b) => Number(b.rating) - Number(a.rating));
     const top = sortedByRating[0];
     const second = sortedByRating[1];
     const diff = second
@@ -257,9 +254,7 @@ export default function DashboardPage() {
 
     // Determine the last place by rating (smallest rating).  In case
     // of ties, the first encountered lowest rating is chosen.
-    const sortedAsc = [...rowsWithStats].sort(
-      (a, b) => Number(a.rating) - Number(b.rating),
-    );
+    const sortedAsc = [...rowsWithStats].sort((a, b) => Number(a.rating) - Number(b.rating));
     const last = sortedAsc[0];
     setSummary({
       topPlayer: { name: top.name, rating: top.rating, diff },
@@ -356,7 +351,8 @@ export default function DashboardPage() {
       matchGroups[e.match_id].push({ player_id: e.player_id, points: Number(e.points) });
     });
 
-    // Build a list of unique match IDs and sort them by match_date and created_at.
+    // Build a list of unique match IDs and sort them by match_date and 
+    // created_at.
     const matchIdList = Object.keys(matchGroups);
     matchIdList.sort((a, b) => {
       const ma = matchesMap[a] || { match_date: null, created_at: null };
@@ -423,12 +419,8 @@ export default function DashboardPage() {
     // after sorting are shown.  Each entry is enriched with the
     // player's name and match date for display.
     const entriesForSort = matchEntries.map((e) => e);
-    const sortedDesc = entriesForSort
-      .slice()
-      .sort((a, b) => Number(b.points) - Number(a.points));
-    const sortedAsc = entriesForSort
-      .slice()
-      .sort((a, b) => Number(a.points) - Number(b.points));
+    const sortedDesc = entriesForSort.slice().sort((a, b) => Number(b.points) - Number(a.points));
+    const sortedAsc = entriesForSort.slice().sort((a, b) => Number(a.points) - Number(b.points));
     const highs = sortedDesc.slice(0, 5).map((e) => {
       const m = matchesMap[e.match_id] || { match_date: null };
       return {
@@ -483,15 +475,16 @@ export default function DashboardPage() {
     const datasets = selectedPlayers.map((pid) => {
       // Find the player name for the legend label
       const player = rows.find((r) => r.player_id === pid);
-      // Use the match_index as the X value so that the horizontal axis represents the global sequence of matches.
+      // Use the match_index as the X value so that the horizontal axis 
+      // represents the global sequence of matches.
       const data = (grouped[pid] || []).map((h) => ({ x: h.match_index, y: h.rating_after }));
       return {
         label: player?.name || pid,
         data,
       };
     });
-    // Define a custom plugin to draw numeric labels above each data point.  This
-    // plugin runs after the datasets are drawn and renders the y‑value of
+    // Define a custom plugin to draw numeric labels above each data point.
+    // This plugin runs after the datasets are drawn and renders the y‑value of
     // each point directly above the marker.  Using a plugin avoids the
     // need for an external Chart.js plugin dependency.
     const dataLabelPlugin = {
@@ -565,7 +558,8 @@ export default function DashboardPage() {
       <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
         <div>
           <h2 style={{ margin: 0 }}>RATING DA TROPA DO 7</h2>
-          {/* Describe the origin of the rating and mention Brazil’s opening match at the 2026 World Cup. */}
+          {/* Describe the origin of the rating and mention Brazil’s opening
+           match at the 2026 World Cup. */}
           <div className="muted">
             Rating criado em janeiro/2026 para o jogo 7 Wonders. A temporada encerra-se
             no primeiro jogo da Copa de 2026 (Brasil × Marrocos, 13/06/2026).
@@ -583,7 +577,7 @@ export default function DashboardPage() {
           dark backgrounds and coloured highlights. */}
       <div className="summary-grid" style={{ marginBottom: 24 }}>
         <div className="summary-card top-player">
-          <div className="summary-icon">🏆</div>
+          <div className="summary-icon"></div>
           <div className="summary-content">
             <div className="summary-title">Top Player</div>
             <div className="summary-player-name">{summary.topPlayer.name || "-"}</div>
@@ -595,7 +589,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="summary-card improvement">
-          <div className="summary-icon">📈</div>
+          <div className="summary-icon"></div>
           <div className="summary-content">
             <div className="summary-title">Maior Evolução</div>
             <div className="summary-player-name">{summary.bestImprovement.name || "-"}</div>
@@ -606,7 +600,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="summary-card decline">
-          <div className="summary-icon">📉</div>
+          <div className="summary-icon"></div>
           <div className="summary-content">
             <div className="summary-title">Maior Queda</div>
             <div className="summary-player-name">{summary.worstDecline.name || "-"}</div>
@@ -617,27 +611,39 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="summary-card streak">
-          <div className="summary-icon">🏅</div>
+          <div className="summary-icon"></div>
           <div className="summary-content">
             <div className="summary-title">Maior Streak Ativa</div>
             <div className="summary-player-name">{summary.activeStreak.name || "-"}</div>
-            <div className="summary-number" style={{ color: "#f0ad4e" }}>{summary.activeStreak.value}</div>
+            <div className="summary-number" style={{ color: "#f0ad4e" }}>
+              {summary.activeStreak.value}
+            </div>
           </div>
         </div>
         {/* Last place card to tease the player at the bottom of the ranking */}
         <div className="summary-card last-place">
-          <div className="summary-icon">🗑️</div>
+          <div className="summary-icon">️</div>
           <div className="summary-content">
             <div className="summary-title">Lanterna</div>
             <div className="summary-player-name">{summary.lastPlace.name || "-"}</div>
-            <div className="summary-number" style={{ color: "#e75a5a" }}>{Math.round(summary.lastPlace.rating || 0)}</div>
+            <div className="summary-number" style={{ color: "#e75a5a" }}>
+              {Math.round(summary.lastPlace.rating || 0)}
+            </div>
             <div style={{ fontSize: 12, color: "#e75a5a" }}>treine mais!</div>
           </div>
         </div>
       </div>
 
-      {/* Grid with ranking table.  Override the column layout to a single column since the score lists are moved elsewhere. */}
-      {/* Grid with ranking table and score lists.  Use two columns so that the lists appear to the right of the ranking. */}
+      {/* AI-powered general dashboard summary. Moved above the ranking table */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <h3 style={{ marginTop: 0 }}>Resumo das Últimas Partidas (IA)</h3>
+        <DashboardInsights recentMatches={10} />
+      </div>
+
+      {/* Grid with ranking table.  Override the column layout to a single 
+         column since the score lists are moved elsewhere. */}
+      {/* Grid with ranking table and score lists.  Use two columns so that 
+         the lists appear to the right of the ranking. */}
       <div className="grid" style={{ gridTemplateColumns: "2fr 1fr" }}>
         {/* Ranking table card */}
         <div className="card">
@@ -675,10 +681,10 @@ export default function DashboardPage() {
                   <tr key={r.player_id} className={rowClass}>
                     <td>
                       {/* Show trophy emojis for the top 3 positions and a trash can for the last position. */}
-                      {i === 0 && <span style={{ marginRight: 4 }}>🥇</span>}
-                      {i === 1 && <span style={{ marginRight: 4 }}>🥈</span>}
-                      {i === 2 && <span style={{ marginRight: 4 }}>🥉</span>}
-                      {i === rows.length - 1 && i > 2 && <span style={{ marginRight: 4 }}>🗑️</span>}
+                      {i === 0 && <span style={{ marginRight: 4 }}></span>}
+                      {i === 1 && <span style={{ marginRight: 4 }}></span>}
+                      {i === 2 && <span style={{ marginRight: 4 }}></span>}
+                      {i === rows.length - 1 && i > 2 && <span style={{ marginRight: 4 }}>️</span>}
                       {i + 1}
                     </td>
                     <td>
@@ -709,7 +715,7 @@ export default function DashboardPage() {
           {topScores.length > 0 && lowScores.length > 0 && (
             <div className="score-list-container" style={{ flexDirection: "column" }}>
               <div className="score-card">
-                <div className="score-card-header" style={{ color: "#4caf50" }}>🟢 Top 5 Pontuações</div>
+                <div className="score-card-header" style={{ color: "#4caf50" }}> Top 5 Pontuações</div>
                 <ul className="score-list">
                   {topScores.map((s, idx) => (
                     <li key={idx} className="score-item">
@@ -743,7 +749,9 @@ export default function DashboardPage() {
           <select
             multiple
             value={selectedPlayers}
-            onChange={(e) => setSelectedPlayers(Array.from(e.target.selectedOptions).map((o) => o.value))}
+            onChange={(e) =>
+              setSelectedPlayers(Array.from((e.target as HTMLSelectElement).selectedOptions).map((o) => (o as HTMLOptionElement).value))
+            }
             style={{ width: "100%", height: 140 }}
           >
             {rows.map((r) => (
@@ -762,15 +770,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* AI-powered general dashboard summary.  This card uses the
-          DashboardInsights component to fetch a natural‑language
-          summary of recent matches and player performance.  It is
-          positioned below the charts to complement the visual data
-          with a narrative report. */}
-      <div className="card" style={{ marginTop: 24 }}>
-        <h3 style={{ marginTop: 0 }}>Resumo das Últimas Partidas (IA)</h3>
-        <DashboardInsights recentMatches={10} />
-      </div>
     </div>
   );
 }
