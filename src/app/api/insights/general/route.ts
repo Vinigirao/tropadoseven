@@ -8,7 +8,9 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import openai from '../../../../lib/openai';
+// Import the free AI helper instead of OpenAI.  This module
+// encapsulates calls to the Hugging Face Inference API.
+import { generateText } from '../../../../lib/free_ai';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -112,21 +114,32 @@ export async function POST(request: Request) {
         winPct: agg.wins / Math.max(agg.matches, 1),
       };
     });
-    // Compose a prompt for OpenAI to summarise the dashboard.  We
-    // include a compact JSON of player summaries and recent match results.
-    const prompt = `Você é um analista de dados para um ranking de 7 Wonders.\n` +
+    // A guard to constrain the style of the generated text.  This tells the model
+    // to avoid Markdown formatting (e.g. negrito) and to keep the output short and direct.
+    const styleGuard = `\nResponda somente em texto simples.\n` +
+      `Não use markdown, negrito, listas ou emojis.\n` +
+      `quero que voce humilhe players ruins que estao mandando mal e exalte os bons e vanglorize.\n` +
+      `use frazes do tipo "tra precisando treinar hein" ou "tu devia ta muito louco nessa ultima partida".\n` +
+      `seja da zoeira, faca piadas, trocadilhos\n` +
+      `Resumo curto, no máximo 20 linhas pode colocar bullet points\n`;
+
+    // Compose a prompt for the AI helper to summarise the dashboard.  We
+    // prepend the styleGuard to ensure the output meets formatting constraints,
+    // and include a compact JSON of player summaries and recent match results.
+    const prompt = `${styleGuard}\n` +
+      `Você é um analista de dados para um ranking de 7 Wonders.\n` +
       `Aqui estão as estatísticas agregadas dos jogadores nas últimas ${matchIds.length} partidas: ${JSON.stringify(playerSummaries)}.\n` +
       `E os resultados das partidas (data, pontuação máxima e vencedores): ${JSON.stringify(matchResults)}.\n\n` +
       `Escreva um relatório em português que destaque quem se destacou, quem teve maior variação positiva ou negativa de rating, ` +
       `e qualquer tendência interessante (por exemplo, jogadores em alta ou em baixa). Compare médias de pontos e percentuais de vitória. ` +
       `Não invente números que não estão nos dados. Use uma linguagem amigável e objetiva.`;
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 400,
-      temperature: 0.2,
+
+    // Generate the summary using the free AI helper.  Reduce the maximum tokens and
+    // lower the temperature to produce a concise, less verbose response.
+    const summary = await generateText(prompt, {
+      maxTokens: 150,
+      temperature: 0.1,
     });
-    const summary = completion.choices?.[0]?.message?.content?.trim() ?? '';
     return NextResponse.json({ summary, players: playerSummaries, matches: matchResults });
   } catch (err: any) {
     console.error(err);

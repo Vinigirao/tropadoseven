@@ -10,7 +10,8 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import openai from '../../../../lib/openai';
+// Import the free AI helper instead of OpenAI.
+import { generateText } from '../../../../lib/free_ai';
 
 // Initialise a Supabase client using a service role key.  The service
 // role key allows read access to views like v_dashboard_players and
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
   try {
     // Fetch aggregated stats for the player from the dashboard view.  This
     // view is defined in supabase_schema.sql and calculates games played,
-    // average points, win percentage, rating, etc【566070757674060†L176-L253】.
+    // average points, win percentage, rating, etc.
     const { data: stats, error: statsError } = await supabase
       .from('v_dashboard_players')
       .select('*')
@@ -67,25 +68,32 @@ export async function POST(request: Request) {
       .limit(recentMatches);
     if (historyError) throw historyError;
 
-    // Compose a prompt for OpenAI.  We explicitly ask the model to
-    // summarise the data and avoid inventing metrics.  The prompt
-    // provides the raw JSON statistics and asks for a Portuguese
-    // narrative.
-    const prompt = `Você é um assistente que analisa estatísticas de partidas do jogo 7 Wonders e descreve o desempenho de um jogador.\n\n` +
+    // A guard to constrain the style of the generated text.  This ensures
+    // the output is plain text and remains concise.  See general route for details.
+    const styleGuard = `\nResponda somente em texto simples.\n` +
+      `Não use markdown, negrito, listas ou emojis.\n` +
+      `quero que voce humilhe players ruins que estao mandando mal e exalte os bons e vanglorize.\n` +
+      `use frazes do tipo "tra precisando treinar hein" ou "tu devia ta muito louco nessa ultima partida".\n` +
+      `seja da zoeira, faca piadas, trocadilhos\n` +
+      `voce vai mandar a real na lata para o player\n` +
+      `Resumo curto 1 paragrafo\n`;
+
+    // Compose a prompt for the AI helper.  We prepend the styleGuard so that
+    // the model does not use markdown formatting and returns a brief summary.  The
+    // prompt provides the raw JSON statistics and asks for a Portuguese narrative.
+    const prompt = `${styleGuard}\n` +
+      `Você é um assistente que analisa estatísticas de partidas do jogo 7 Wonders e descreve o desempenho de um jogador.\n\n` +
       `Dados do jogador (JSON): ${JSON.stringify(stats)}\n` +
       `Histórico de rating (últimas ${history?.length ?? 0} partidas, JSON): ${JSON.stringify(history)}\n\n` +
       `Com base nesses dados, escreva um resumo em português do desempenho do jogador: destaque pontos médios, porcentagem de vitórias, tendência recente do rating e qualquer melhora ou queda significativa. ` +
       `Compare com a média dos outros jogadores quando possível. Não invente números que não estejam nos dados. Retorne apenas o texto do resumo, sem colunas de JSON.`;
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 300,
-      temperature: 0.2,
+    // Generate the summary using the free AI helper.  Lower maxTokens and temperature
+    // to produce a more concise, less verbose response.
+    const summary = await generateText(prompt, {
+      maxTokens: 150,
+      temperature: 0.1,
     });
-
-    const summary = completion.choices?.[0]?.message?.content?.trim() ?? '';
-
     return NextResponse.json({
       summary,
       stats,
