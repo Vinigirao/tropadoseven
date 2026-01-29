@@ -34,6 +34,13 @@ type DashRow = {
    * table.
    */
   wins?: number;
+  /**
+   * Média do rating ao longo das partidas. É calculada somando todos os valores
+   * de rating_after registrados para o jogador e dividindo pelo número de
+   * partidas jogadas. Se o jogador ainda não possui partidas, este valor será
+   * indefinido.
+   */
+  avg_rating?: number;
 };
 
 // Each history row includes the global match order index so the X axis
@@ -279,6 +286,25 @@ export default function DashboardPage() {
     lows: { player_name: string; points: number; match_date: string | null }[];
     currentStreakMap: Record<string, number>;
   }> {
+    // Fetch rating history to compute average rating per player.  We sum
+    // all rating_after values per player and divide by the number of
+    // matches later when merging stats.  If a player has no recorded
+    // ratings, their average will be undefined.
+    const { data: ratingData } = await supabase
+      .from("rating_history")
+      .select("player_id, rating_after");
+    const ratingMap: Record<string, { sum: number; count: number }> = {};
+    (ratingData || []).forEach((rh: any) => {
+      const pid = rh.player_id;
+      const ratingVal = Number(rh.rating_after);
+      if (!ratingMap[pid]) {
+        ratingMap[pid] = { sum: ratingVal, count: 1 };
+      } else {
+        ratingMap[pid].sum += ratingVal;
+        ratingMap[pid].count += 1;
+      }
+    });
+
     // Fetch all match entries.  These provide the points scored by
     // each player in each match.
     const { data: entriesData } = await supabase
@@ -290,11 +316,21 @@ export default function DashboardPage() {
       points: number;
     }[];
 
-    // If there are no entries (no matches played yet), simply return
-    // the base rows and empty top/bottom lists and an empty streak map.
+    // If there are no entries (no matches played yet), still compute the
+    // average rating for each player and return the base rows enriched
+    // with that value.  Top/bottom lists and streak maps remain empty.
     if (matchEntries.length === 0) {
+      const rowsWithStats: DashRow[] = baseRows.map((row) => {
+        return {
+          ...row,
+          avg_rating:
+            ratingMap[row.player_id]
+              ? ratingMap[row.player_id].sum / ratingMap[row.player_id].count
+              : undefined,
+        };
+      });
       return {
-        rowsWithStats: baseRows,
+        rowsWithStats,
         highs: [],
         lows: [],
         currentStreakMap: {},
@@ -446,6 +482,11 @@ export default function DashboardPage() {
     const rowsWithStats: DashRow[] = baseRows.map((row) => {
       return {
         ...row,
+        // Include average rating calculated earlier.  If absent, leave undefined.
+        avg_rating:
+          ratingMap[row.player_id]
+            ? ratingMap[row.player_id].sum / ratingMap[row.player_id].count
+            : undefined,
         max_score: maxMinMap[row.player_id]?.max ?? undefined,
         min_score: maxMinMap[row.player_id]?.min ?? undefined,
         win_streak: winStreakMap[row.player_id] ?? 0,
@@ -653,21 +694,22 @@ export default function DashboardPage() {
               <tr>
                 <th>#</th>
                 <th>Jogador</th>
-                <th className="right">Vitórias</th>
                 <th className="right">Rating</th>
-                <th className="right">% Vitórias</th>
-                <th className="right">Média</th>
+                <th className="right">Rating Médio</th>
+                <th className="right">% Vitórias</th>
+                <th className="right">Vitórias</th>
                 <th className="right">Partidas</th>
-                <th className="right">Máx</th>
-                <th className="right">Streak</th>
-                <th className="right">Pior</th>
-                <th className="right">Δ (10)</th>
+                <th className="right">Média</th>
+                <th className="right">Máx Streak</th>
+                <th className="right">Maxima pontuação</th>
+                <th className="right">Pior pontuação</th>
+                <th className="right">Δ</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="muted">Nenhuma partida registrada ainda.</td>
+                  <td colSpan={12} className="muted">Nenhuma partida registrada ainda.</td>
                 </tr>
               )}
               {rows.map((r, i) => {
@@ -691,13 +733,14 @@ export default function DashboardPage() {
                       {/* Make player name a styled button‑like link to emphasise profile access */}
                       <a href={`/players/${r.player_id}`} className="profile-link">{r.name}</a>
                     </td>
-                    <td className="right">{r.wins ?? 0}</td>
                     <td className="right"><b>{Math.round(r.rating)}</b></td>
+                    <td className="right">{r.avg_rating !== undefined ? Math.round(Number(r.avg_rating)) : "-"}</td>
                     <td className="right">{(r.win_pct * 100).toFixed(1)}%</td>
-                    <td className="right">{Math.round(Number(r.avg_points))}</td>
+                    <td className="right">{r.wins ?? 0}</td>
                     <td className="right">{r.games}</td>
-                    <td className="right">{r.max_score !== undefined ? Math.round(r.max_score) : "-"}</td>
+                    <td className="right">{Math.round(Number(r.avg_points))}</td>
                     <td className="right">{r.win_streak ?? 0}</td>
+                    <td className="right">{r.max_score !== undefined ? Math.round(r.max_score) : "-"}</td>
                     <td className="right">{r.min_score !== undefined ? Math.round(r.min_score) : "-"}</td>
                     <td className="right">
                       {r.delta_last_10 > 0 && <span style={{ color: "#4caf50" }}>▲ {Number(r.delta_last_10).toFixed(1)}</span>}
