@@ -67,17 +67,7 @@ a {
   padding: 12px;
 }
 
-@media (min-width: 640px) {
-  .container {
-    padding: 16px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .container {
-    padding: 24px;
-  }
-}
+/* Layout unificado: mesmo visual em todas as telas */
 
 /* ---------- Header ---------- */
 .app-header {
@@ -111,16 +101,7 @@ a {
   flex-wrap: wrap;
 }
 
-@media (min-width: 640px) {
-  .app-header {
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .app-header h1 {
-    font-size: 1.5rem;
-  }
-}
+/* Header unificado */
 
 /* ---------- Cards ---------- */
 .card {
@@ -151,20 +132,6 @@ a {
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin-bottom: 16px;
-}
-
-@media (min-width: 640px) {
-  .summary-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .summary-grid {
-    grid-template-columns: repeat(5, 1fr);
-    gap: 14px;
-  }
 }
 
 .summary-card {
@@ -485,20 +452,8 @@ tr.rank-last:hover { background: rgba(239, 68, 68, 0.1) !important; }
   grid-template-columns: 1fr;
 }
 
-@media (min-width: 768px) {
-  .grid-2 {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
 .grid-main {
   grid-template-columns: 1fr;
-}
-
-@media (min-width: 1024px) {
-  .grid-main {
-    grid-template-columns: 2fr 1fr;
-  }
 }
 
 /* ---------- Score Lists ---------- */
@@ -605,18 +560,6 @@ tr.rank-last:hover { background: rgba(239, 68, 68, 0.1) !important; }
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
-}
-
-@media (min-width: 480px) {
-  .map-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 768px) {
-  .map-stats-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
 }
 
 .map-stat-card {
@@ -872,23 +815,4 @@ button.secondary {
   margin-bottom: 16px;
 }
 
-/* ---------- Responsive helpers ---------- */
-.hide-mobile {
-  display: none;
-}
-
-@media (min-width: 768px) {
-  .hide-mobile {
-    display: table-cell;
-  }
-}
-
-.show-mobile-only {
-  display: table-cell;
-}
-
-@media (min-width: 768px) {
-  .show-mobile-only {
-    display: none;
-  }
-}
+/* ---------- Responsive helpers (desativados - layout unificado) ---------- */
