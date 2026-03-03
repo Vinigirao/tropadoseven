@@ -4,24 +4,13 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 import Chart from "chart.js/auto";
 
-/**
- * Page for comparing two players.  Users can select any two players and
- * view their rating evolution, how many games they've played together,
- * head‑to‑head wins and draws, and their average points across all
- * matches.  The layout mirrors the existing dashboard styling by
- * leveraging the same global CSS classes.
- */
-
 type Player = { id: string; name: string };
 type HistoryRow = { player_id: string; rating_after: number; match_index: number };
 type MatchEntry = { match_id: string; player_id: string; points: number };
 
-// Client‑side Supabase client using the anon credentials.  These
-// environment variables are exposed in the browser because they are
-// prefixed with NEXT_PUBLIC_.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 export default function ComparePage() {
@@ -29,70 +18,35 @@ export default function ComparePage() {
   const [p1, setP1] = useState<string>("");
   const [p2, setP2] = useState<string>("");
   const [history, setHistory] = useState<HistoryRow[]>([]);
-  const [metrics, setMetrics] = useState<
-    | {
-        common: number;
-        wins1: number;
-        wins2: number;
-        draws: number;
-        avg1: number;
-        avg2: number;
-      }
-    | null
-  >(null);
+  const [metrics, setMetrics] = useState<{
+    common: number; wins1: number; wins2: number; draws: number; avg1: number; avg2: number;
+  } | null>(null);
   const chartRef = useRef<Chart | null>(null);
 
-  // Load all players on mount so they can be selected.
   useEffect(() => {
     async function loadPlayers() {
-      const { data, error } = await supabase
-        .from("players")
-        .select("id,name")
-        .order("name");
-      if (!error) {
-        setPlayers((data as Player[]) || []);
-      }
+      const { data, error } = await supabase.from("players").select("id,name").order("name");
+      if (!error) setPlayers((data as Player[]) || []);
     }
     loadPlayers();
   }, []);
 
-  // Whenever either selection changes, recompute comparison data.
   useEffect(() => {
     async function loadComparison() {
-      // Reset when selections are invalid (empty or equal)
-      if (!p1 || !p2 || p1 === p2) {
-        setHistory([]);
-        setMetrics(null);
-        return;
-      }
-      // Fetch rating history for both players using the view with global match order.
+      if (!p1 || !p2 || p1 === p2) { setHistory([]); setMetrics(null); return; }
       const { data: histData } = await supabase
         .from("v_rating_history_with_order")
         .select("player_id,rating_after,match_index")
         .in("player_id", [p1, p2])
         .order("match_index", { ascending: true });
       setHistory((histData as HistoryRow[]) || []);
-      // Fetch all match entries for the two players.  We fetch all entries
-      // rather than only common matches because it's inexpensive and allows
-      // us to compute averages in one place.
       const { data: entriesData } = await supabase
-        .from("match_entries")
-        .select("match_id,player_id,points")
-        .in("player_id", [p1, p2]);
+        .from("match_entries").select("match_id,player_id,points").in("player_id", [p1, p2]);
       const entries = (entriesData as MatchEntry[]) || [];
-      // Group entries by match to determine games where both players
-      // participated.
       const grouped: Record<string, MatchEntry[]> = {};
-      entries.forEach((e) => {
-        if (!grouped[e.match_id]) grouped[e.match_id] = [];
-        grouped[e.match_id].push(e);
-      });
-      let commonMatches = 0;
-      let wins1 = 0;
-      let wins2 = 0;
-      let draws = 0;
+      entries.forEach((e) => { if (!grouped[e.match_id]) grouped[e.match_id] = []; grouped[e.match_id].push(e); });
+      let commonMatches = 0, wins1 = 0, wins2 = 0, draws = 0;
       Object.values(grouped).forEach((list) => {
-        // A match is common if both player IDs appear in the group.
         if (list.length >= 2) {
           commonMatches++;
           const e1 = list.find((e) => e.player_id === p1)!;
@@ -102,186 +56,137 @@ export default function ComparePage() {
           else draws++;
         }
       });
-      // Fetch all points for each player to compute average points across
-      // their entire match history.  Supabase does not currently
-      // aggregate numeric values in the PostgREST client, so we
-      // compute averages in JavaScript.
-      const { data: p1Entries } = await supabase
-        .from("match_entries")
-        .select("points")
-        .eq("player_id", p1);
-      const { data: p2Entries } = await supabase
-        .from("match_entries")
-        .select("points")
-        .eq("player_id", p2);
-      const avg1 =
-        p1Entries && p1Entries.length > 0
-          ? (p1Entries as { points: number }[]).reduce((sum, e) => sum + Number(e.points), 0) /
-            (p1Entries as { points: number }[]).length
-          : 0;
-      const avg2 =
-        p2Entries && p2Entries.length > 0
-          ? (p2Entries as { points: number }[]).reduce((sum, e) => sum + Number(e.points), 0) /
-            (p2Entries as { points: number }[]).length
-          : 0;
+      const { data: p1E } = await supabase.from("match_entries").select("points").eq("player_id", p1);
+      const { data: p2E } = await supabase.from("match_entries").select("points").eq("player_id", p2);
+      const avg1 = p1E && p1E.length > 0 ? (p1E as any[]).reduce((s, e) => s + Number(e.points), 0) / p1E.length : 0;
+      const avg2 = p2E && p2E.length > 0 ? (p2E as any[]).reduce((s, e) => s + Number(e.points), 0) / p2E.length : 0;
       setMetrics({ common: commonMatches, wins1, wins2, draws, avg1, avg2 });
     }
     loadComparison();
   }, [p1, p2]);
 
-  // Draw or update the comparison chart whenever the history or players change.
   useEffect(() => {
     const canvas = document.getElementById("compareChart") as HTMLCanvasElement | null;
     if (!canvas) return;
-    // Clean up previous chart to avoid memory leaks.
-    if (chartRef.current) {
-      chartRef.current.destroy();
-    }
-    // Group history rows by player ID to build separate datasets.
+    if (chartRef.current) chartRef.current.destroy();
     const grouped: Record<string, HistoryRow[]> = {};
-    history.forEach((h) => {
-      if (!grouped[h.player_id]) grouped[h.player_id] = [];
-      grouped[h.player_id].push(h);
-    });
+    history.forEach((h) => { if (!grouped[h.player_id]) grouped[h.player_id] = []; grouped[h.player_id].push(h); });
     const datasets: any[] = [];
-    [p1, p2].forEach((pid) => {
+    const colors = ["#3b82f6", "#a855f7"];
+    [p1, p2].forEach((pid, idx) => {
       if (!pid) return;
       const player = players.find((pl) => pl.id === pid);
-      const data = (grouped[pid] || []).map((h) => ({ x: h.match_index, y: h.rating_after }));
       datasets.push({
         label: player?.name || pid,
-        data,
+        data: (grouped[pid] || []).map((h) => ({ x: h.match_index, y: h.rating_after })),
+        borderColor: colors[idx],
+        backgroundColor: colors[idx] + "20",
+        borderWidth: 2, pointRadius: 3, tension: 0.3, fill: false,
       });
     });
     if (datasets.length > 0) {
       chartRef.current = new Chart(canvas, {
         type: "line",
-        data: {
-          labels: [],
-          datasets,
-        },
+        data: { labels: [], datasets },
         options: {
           responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
           plugins: {
-            legend: {
-              labels: { color: "#e9eefc" },
-            },
+            legend: { labels: { color: "#94a3b8", usePointStyle: true, pointStyle: "circle" } },
+            tooltip: { backgroundColor: "#1e293b", titleColor: "#f1f5f9", bodyColor: "#94a3b8", borderColor: "#334155", borderWidth: 1 },
           },
           scales: {
-            x: {
-              type: "linear",
-              title: {
-                display: true,
-                text: "Ordem da Partida",
-                color: "#e9eefc",
-              },
-              ticks: {
-                color: "#93a4c7",
-                precision: 0,
-              },
-            },
-            y: {
-              title: {
-                display: true,
-                text: "Rating",
-                color: "#e9eefc",
-              },
-              ticks: {
-                color: "#93a4c7",
-              },
-            },
+            x: { type: "linear", title: { display: true, text: "Partida", color: "#64748b" }, ticks: { color: "#64748b", precision: 0 }, grid: { color: "rgba(30,41,59,0.3)" } },
+            y: { title: { display: true, text: "Rating", color: "#64748b" }, ticks: { color: "#64748b" }, grid: { color: "rgba(30,41,59,0.3)" } },
           },
         },
       });
     }
   }, [history, p1, p2, players]);
 
-  const selectedP1 = players.find((pl) => pl.id === p1);
-  const selectedP2 = players.find((pl) => pl.id === p2);
+  const n1 = players.find((pl) => pl.id === p1);
+  const n2 = players.find((pl) => pl.id === p2);
+
+  const MetricRow = ({ label, v1, v2, highlight }: { label: string; v1: string | number; v2: string | number; highlight?: boolean }) => (
+    <div style={{
+      display: "flex", justifyContent: "space-between", alignItems: "center",
+      padding: "10px 0", borderBottom: "1px solid var(--border)", fontSize: "0.85rem",
+    }}>
+      <span style={{ fontWeight: 700, color: highlight ? "var(--accent-blue-light)" : "var(--text-primary)", minWidth: 40, textAlign: "center" }}>{v1}</span>
+      <span style={{ color: "var(--text-secondary)", flex: 1, textAlign: "center" }}>{label}</span>
+      <span style={{ fontWeight: 700, color: highlight ? "var(--accent-purple)" : "var(--text-primary)", minWidth: 40, textAlign: "center" }}>{v2}</span>
+    </div>
+  );
 
   return (
     <div className="container">
-      <div className="row" style={{ justifyContent: "space-between", marginBottom: 16 }}>
+      <div className="app-header">
         <div>
-          <h2 style={{ margin: 0 }}>Comparação de Jogadores</h2>
-          <div className="muted">Selecione dois jogadores para comparar métricas e histórico</div>
+          <h1 style={{
+            background: "linear-gradient(135deg, var(--accent-blue-light), var(--accent-purple))",
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+            fontSize: "1.5rem", fontWeight: 800,
+          }}>
+            Comparação de Jogadores
+          </h1>
+          <div className="subtitle">Selecione dois jogadores para comparar métricas e histórico</div>
         </div>
-        <a href="/" className="muted">
-          Voltar ao Dashboard
-        </a>
+        <a href="/" className="btn btn-secondary">Voltar ao Dashboard</a>
       </div>
 
-      <div className="card" style={{ marginBottom: 16 }}>
-        <div className="row" style={{ gap: 12 }}>
-          <div style={{ flex: 1 }}>
-            <label className="muted">Jogador 1</label>
+      <div className="card section-gap">
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 4, fontWeight: 600 }}>JOGADOR 1</div>
             <select value={p1} onChange={(e) => setP1(e.target.value)} style={{ width: "100%" }}>
-              <option value="">-- Selecione --</option>
-              {players.map((pl) => (
-                <option key={pl.id} value={pl.id}>
-                  {pl.name}
-                </option>
-              ))}
+              <option value="">— Selecione —</option>
+              {players.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
             </select>
           </div>
-          <div style={{ flex: 1 }}>
-            <label className="muted">Jogador 2</label>
+          <div style={{ display: "flex", alignItems: "center", color: "var(--text-muted)", fontWeight: 800, fontSize: "1.2rem", paddingTop: 16 }}>VS</div>
+          <div style={{ flex: 1, minWidth: 150 }}>
+            <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 4, fontWeight: 600 }}>JOGADOR 2</div>
             <select value={p2} onChange={(e) => setP2(e.target.value)} style={{ width: "100%" }}>
-              <option value="">-- Selecione --</option>
-              {players.map((pl) => (
-                <option key={pl.id} value={pl.id}>
-                  {pl.name}
-                </option>
-              ))}
+              <option value="">— Selecione —</option>
+              {players.map((pl) => <option key={pl.id} value={pl.id}>{pl.name}</option>)}
             </select>
           </div>
         </div>
       </div>
 
       {p1 && p2 && p1 !== p2 && (
-        <>
-          <div className="grid">
-            <div className="card">
-              <h3 style={{ marginTop: 0 }}>Histórico de Rating</h3>
-              <canvas id="compareChart" height={180} />
-            </div>
-            <div className="card">
-              <h3 style={{ marginTop: 0 }}>Métricas</h3>
-              {metrics ? (
-                <table>
-                  <tbody>
-                    <tr>
-                      <td>Jogos em comum</td>
-                      <td className="right">{metrics.common}</td>
-                    </tr>
-                    <tr>
-                      <td>Vitórias {selectedP1?.name}</td>
-                      <td className="right">{metrics.wins1}</td>
-                    </tr>
-                    <tr>
-                      <td>Vitórias {selectedP2?.name}</td>
-                      <td className="right">{metrics.wins2}</td>
-                    </tr>
-                    <tr>
-                      <td>Empates</td>
-                      <td className="right">{metrics.draws}</td>
-                    </tr>
-                    <tr>
-                      <td>Média de pontos {selectedP1?.name}</td>
-                      <td className="right">{metrics.avg1.toFixed(2)}</td>
-                    </tr>
-                    <tr>
-                      <td>Média de pontos {selectedP2?.name}</td>
-                      <td className="right">{metrics.avg2.toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              ) : (
-                <div className="muted">Carregando métricas...</div>
-              )}
+        <div className="grid grid-2">
+          <div className="card">
+            <div className="card-title">Evolução do Rating</div>
+            <div className="chart-container" style={{ height: 300 }}>
+              <canvas id="compareChart" />
             </div>
           </div>
-        </>
+          <div className="card">
+            <div className="card-title">Head to Head</div>
+            {metrics ? (
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, padding: "0 8px" }}>
+                  <span style={{ color: "var(--accent-blue-light)", fontWeight: 800, fontSize: "1rem" }}>{n1?.name}</span>
+                  <span style={{ color: "var(--accent-purple)", fontWeight: 800, fontSize: "1rem" }}>{n2?.name}</span>
+                </div>
+                <MetricRow label="Vitórias" v1={metrics.wins1} v2={metrics.wins2} highlight />
+                <MetricRow label="Média de Pontos" v1={metrics.avg1.toFixed(1)} v2={metrics.avg2.toFixed(1)} highlight />
+                <MetricRow label="Empates" v1={metrics.draws} v2={metrics.draws} />
+                <div style={{
+                  display: "flex", justifyContent: "center", alignItems: "center",
+                  marginTop: 16, padding: "12px", background: "var(--bg-elevated)",
+                  borderRadius: "var(--radius-sm)", fontSize: "0.85rem", color: "var(--text-secondary)"
+                }}>
+                  {metrics.common} jogos em comum
+                </div>
+              </div>
+            ) : (
+              <div className="empty-state">Carregando métricas...</div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
