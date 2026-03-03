@@ -475,6 +475,44 @@ tr.rank-last:hover { background: rgba(239, 68, 68, 0.1) !important; }
   background: rgba(255,255,255,0.05);
 }
 
+/* Compare CTA - prominent button */
+.btn-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 2px solid var(--accent-gold);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.2));
+  color: var(--accent-gold);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.2), inset 0 1px 0 rgba(251, 191, 36, 0.1);
+  transition: all 0.25s ease;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  animation: compare-glow 2.5s ease-in-out infinite alternate;
+}
+
+.btn-compare:hover {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.25), rgba(245, 158, 11, 0.35));
+  box-shadow: 0 0 24px rgba(251, 191, 36, 0.35), inset 0 1px 0 rgba(251, 191, 36, 0.15);
+  transform: translateY(-1px);
+  color: #fde68a;
+}
+
+.btn-compare:active {
+  transform: translateY(0);
+}
+
+@keyframes compare-glow {
+  0% { box-shadow: 0 0 12px rgba(251, 191, 36, 0.15), inset 0 1px 0 rgba(251, 191, 36, 0.1); }
+  100% { box-shadow: 0 0 20px rgba(251, 191, 36, 0.3), inset 0 1px 0 rgba(251, 191, 36, 0.15); }
+}
+
 /* ---------- Grid Layouts ---------- */
 .grid {
   display: grid;

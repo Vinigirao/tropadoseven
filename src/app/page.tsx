@@ -243,7 +243,7 @@ export default function DashboardPage() {
         best_player_win_rate: bestWinRate * 100,
         best_player_avg: bestAvg,
       };
-    }).sort((a, b) => b.total_plays - a.total_plays);
+    }).sort((a, b) => b.win_rate - a.win_rate);
 
     setMapStats(stats);
   }
@@ -627,7 +627,7 @@ export default function DashboardPage() {
           </div>
         </div>
         <div className="header-actions">
-          <a href="/compare" className="btn btn-primary">Comparar</a>
+          <a href="/compare" className="btn-compare">Comparar Jogadores</a>
           <a href="/admin" className="btn btn-secondary">Admin</a>
         </div>
       </div>
@@ -719,15 +719,15 @@ export default function DashboardPage() {
                     <th>#</th>
                     <th>Jogador</th>
                     <th className="right">Rating</th>
-                    <th className="right hide-mobile">Melhor</th>
-                    <th className="right hide-mobile">Pior</th>
-                    <th className="center hide-mobile">Evolução</th>
+                    <th className="right">Melhor</th>
+                    <th className="right">Pior</th>
+                    <th className="center">Evolução</th>
                     <th className="right">Vitórias</th>
-                    <th className="right hide-mobile">% Vitórias</th>
-                    <th className="right hide-mobile">Partidas</th>
-                    <th className="right hide-mobile">Média Pts</th>
-                    <th className="right hide-mobile">Streak</th>
-                    <th className="center hide-mobile">Melhor Mapa</th>
+                    <th className="right">% Vitórias</th>
+                    <th className="right">Partidas</th>
+                    <th className="right">Média Pts</th>
+                    <th className="right">Streak</th>
+                    <th className="center">Melhor Mapa</th>
                     <th className="right">Δ10</th>
                   </tr>
                 </thead>
@@ -757,30 +757,30 @@ export default function DashboardPage() {
                         <td className="right">
                           <span className="rating-badge">{Math.round(r.rating)}</span>
                         </td>
-                        <td className="right hide-mobile">
+                        <td className="right">
                           <span className="rating-best">
                             {r.best_rating !== undefined ? Math.round(r.best_rating) : "—"}
                           </span>
                         </td>
-                        <td className="right hide-mobile">
+                        <td className="right">
                           <span className="rating-worst">
                             {r.worst_rating !== undefined ? Math.round(r.worst_rating) : "—"}
                           </span>
                         </td>
-                        <td className="center sparkline-cell hide-mobile">
+                        <td className="center sparkline-cell">
                           <Sparkline
                             data={r.rating_history || []}
                             color={CHART_COLORS[i % CHART_COLORS.length]}
                           />
                         </td>
                         <td className="right" style={{ fontWeight: 700 }}>{r.wins ?? 0}</td>
-                        <td className="right hide-mobile">
+                        <td className="right">
                           <WinPctBar pct={r.win_pct * 100} />
                         </td>
-                        <td className="right hide-mobile">{r.games}</td>
-                        <td className="right hide-mobile">{Math.round(Number(r.avg_points))}</td>
-                        <td className="right hide-mobile">{r.win_streak ?? 0}</td>
-                        <td className="center hide-mobile">
+                        <td className="right">{r.games}</td>
+                        <td className="right">{Math.round(Number(r.avg_points))}</td>
+                        <td className="right">{r.win_streak ?? 0}</td>
+                        <td className="center">
                           {r.best_map ? (
                             <span className="map-badge">{r.best_map} ({r.best_map_wins}W)</span>
                           ) : (
@@ -917,8 +917,8 @@ export default function DashboardPage() {
                       <th className="right">Win Rate</th>
                       <th className="right">Média Pts</th>
                       <th>Melhor Player</th>
-                      <th className="right hide-mobile">Win Rate Player</th>
-                      <th className="right hide-mobile">Média Player</th>
+                      <th className="right">Win Rate Player</th>
+                      <th className="right">Média Player</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -934,8 +934,8 @@ export default function DashboardPage() {
                         <td>
                           <span style={{ color: "var(--accent-blue-light)", fontWeight: 600 }}>{ms.best_player}</span>
                         </td>
-                        <td className="right hide-mobile">{ms.best_player_win_rate.toFixed(0)}%</td>
-                        <td className="right hide-mobile">{ms.best_player_avg.toFixed(0)}</td>
+                        <td className="right">{ms.best_player_win_rate.toFixed(0)}%</td>
+                        <td className="right">{ms.best_player_avg.toFixed(0)}</td>
                       </tr>
                     ))}
                   </tbody>
