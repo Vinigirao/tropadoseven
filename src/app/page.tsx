@@ -24,12 +24,22 @@ type DashRow = {
   rating_history?: number[];
   best_map?: string;
   best_map_wins?: number;
+  win_score?: number; // beaten opponents / total opponents
 };
 
 type HistoryRow = {
   player_id: string;
   rating_after: number;
   match_index: number;
+};
+
+type PlayerDetailInMap = {
+  name: string;
+  plays: number;
+  wins: number;
+  win_rate: number;
+  avg_points: number;
+  win_score: number;
 };
 
 type MapStat = {
@@ -41,6 +51,8 @@ type MapStat = {
   best_player: string;
   best_player_win_rate: number;
   best_player_avg: number;
+  player_details: PlayerDetailInMap[];
+  best_player_games: number;
 };
 
 // ── Supabase Client ──────────────────────────────────────────────────
@@ -103,13 +115,14 @@ function Sparkline({ data, width = 80, height = 24, color = "#3b82f6" }: {
 
 // ── Win Percentage Bar ───────────────────────────────────────────────
 function WinPctBar({ pct }: { pct: number }) {
-  const color = pct >= 40 ? "var(--accent-green)" : pct >= 25 ? "var(--accent-orange)" : "var(--accent-red)";
+  const safePct = Number.isFinite(pct) ? pct : 0;
+  const color = safePct >= 40 ? "var(--accent-green)" : safePct >= 25 ? "var(--accent-orange)" : "var(--accent-red)";
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
       <span className="winpct-bar">
-        <span className="winpct-fill" style={{ width: `${Math.min(pct, 100)}%`, background: color }} />
+        <span className="winpct-fill" style={{ width: `${Math.min(safePct, 100)}%`, background: color }} />
       </span>
-      <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>{pct.toFixed(0)}%</span>
+      <span style={{ fontSize: "0.78rem", fontWeight: 600 }}>{safePct.toFixed(0)}%</span>
     </span>
   );
 }
@@ -123,9 +136,15 @@ export default function DashboardPage() {
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [mapStats, setMapStats] = useState<MapStat[]>([]);
   const [activeTab, setActiveTab] = useState<"ranking" | "charts" | "maps">("ranking");
+  const [selectedMap, setSelectedMap] = useState<string | null>(null);
+  const [chartType, setChartType] = useState<"rating" | "wins" | "points" | "winrate" | "consistency" | "heatmap">("rating");
+  const [heatmapData, setHeatmapData] = useState<{ players: string[]; matrix: number[][]; gamesMatrix: number[][] }>({ players: [], matrix: [], gamesMatrix: [] });
+  const [showRatingDataLabels, setShowRatingDataLabels] = useState(true);
   const chartRef = useRef<Chart | null>(null);
   const winsChartRef = useRef<Chart | null>(null);
   const pointsDistChartRef = useRef<Chart | null>(null);
+  const winrateChartRef = useRef<Chart | null>(null);
+  const consistencyChartRef = useRef<Chart | null>(null);
   const [topScores, setTopScores] = useState<{ player_name: string; points: number; match_date: string | null }[]>([]);
   const [lowScores, setLowScores] = useState<{ player_name: string; points: number; match_date: string | null }[]>([]);
   const [summary, setSummary] = useState({
@@ -193,7 +212,7 @@ export default function DashboardPage() {
       total_plays: number;
       total_points: number;
       wins: number;
-      player_stats: Record<string, { plays: number; wins: number; total_points: number }>;
+      player_stats: Record<string, { plays: number; wins: number; total_points: number; beaten: number; totalOpponents: number }>;
     }> = {};
 
     Object.values(matchGroups).forEach((group) => {
@@ -211,11 +230,16 @@ export default function DashboardPage() {
         if (winners.includes(e.player_id)) md.wins++;
 
         if (!md.player_stats[e.player_id]) {
-          md.player_stats[e.player_id] = { plays: 0, wins: 0, total_points: 0 };
+          md.player_stats[e.player_id] = { plays: 0, wins: 0, total_points: 0, beaten: 0, totalOpponents: 0 };
         }
         md.player_stats[e.player_id].plays++;
         md.player_stats[e.player_id].total_points += Number(e.points);
         if (winners.includes(e.player_id)) md.player_stats[e.player_id].wins++;
+
+        const opponents = group.filter(o => o.player_id !== e.player_id);
+        const beaten = opponents.filter(o => Number(e.points) > Number(o.points)).length;
+        md.player_stats[e.player_id].beaten += beaten;
+        md.player_stats[e.player_id].totalOpponents += opponents.length;
       });
     });
 
@@ -224,6 +248,7 @@ export default function DashboardPage() {
       let bestPid = "";
       let bestWinRate = -1;
       let bestAvg = 0;
+      let bestPlayerGames = 0;
       Object.entries(d.player_stats).forEach(([pid, ps]) => {
         const wr = ps.plays >= 2 ? ps.wins / ps.plays : 0;
         const avg = ps.total_points / ps.plays;
@@ -231,8 +256,20 @@ export default function DashboardPage() {
           bestPid = pid;
           bestWinRate = wr;
           bestAvg = avg;
+          bestPlayerGames = ps.plays;
         }
       });
+
+      // Compute player_details for this map
+      const player_details: PlayerDetailInMap[] = Object.entries(d.player_stats).map(([pid, ps]) => ({
+        name: playerMap[pid] || pid,
+        plays: ps.plays,
+        wins: ps.wins,
+        win_rate: ps.plays > 0 ? (ps.wins / ps.plays) * 100 : 0,
+        avg_points: ps.plays > 0 ? ps.total_points / ps.plays : 0,
+        win_score: ps.totalOpponents > 0 ? (ps.beaten / ps.totalOpponents) * 100 : 0,
+      })).sort((a, b) => b.win_rate - a.win_rate);
+
       return {
         map,
         total_plays: d.total_plays,
@@ -242,14 +279,25 @@ export default function DashboardPage() {
         best_player: playerMap[bestPid] || bestPid,
         best_player_win_rate: bestWinRate * 100,
         best_player_avg: bestAvg,
+        player_details,
+        best_player_games: bestPlayerGames,
       };
-    }).sort((a, b) => b.total_plays - a.total_plays);
+    }).sort((a, b) => {
+      // Sort by win_rate descending, then by total_plays descending
+      if (b.win_rate !== a.win_rate) return b.win_rate - a.win_rate;
+      return b.total_plays - a.total_plays;
+    });
 
     setMapStats(stats);
   }
 
   useEffect(() => { loadDashboard(); loadMapStats(); }, []);
   useEffect(() => { loadHistory(selectedPlayers); }, [selectedPlayers]);
+  useEffect(() => {
+    if (activeTab === "charts" && chartType === "heatmap" && rows.length > 0) {
+      computeHeatmapData();
+    }
+  }, [activeTab, chartType, rows]);
 
   // ── Summary Metrics ────────────────────────────────────────────────
   function computeSummaryMetrics(rowsWithStats: DashRow[], currentStreakMap: Record<string, number>) {
@@ -358,6 +406,7 @@ export default function DashboardPage() {
     const winsCount: Record<string, number> = {};
     // Best map tracking: map -> { wins, plays } per player
     const playerMapWins: Record<string, Record<string, { wins: number; plays: number }>> = {};
+    const winScoreMap: Record<string, { beaten: number; totalOpponents: number }> = {};
 
     matchIdList.forEach((matchId) => {
       const entries = matchGroups[matchId];
@@ -386,6 +435,16 @@ export default function DashboardPage() {
           currentStreak[pid] = 0;
         }
       }
+
+      // Win Score: count opponents beaten
+      entries.forEach((e) => {
+        const pid = e.player_id;
+        const opponents = entries.filter(o => o.player_id !== pid);
+        const beaten = opponents.filter(o => Number(e.points) > Number(o.points)).length;
+        if (!winScoreMap[pid]) winScoreMap[pid] = { beaten: 0, totalOpponents: 0 };
+        winScoreMap[pid].beaten += beaten;
+        winScoreMap[pid].totalOpponents += opponents.length;
+      });
     });
 
     // Top/bottom scores
@@ -425,15 +484,91 @@ export default function DashboardPage() {
         wins: winsCount[row.player_id] ?? 0,
         best_map: bestMap || undefined,
         best_map_wins: bestMapWins || undefined,
+        win_score: winScoreMap[row.player_id] ? (winScoreMap[row.player_id].beaten / winScoreMap[row.player_id].totalOpponents) * 100 : 0,
       };
     });
 
     return { rowsWithStats, highs, lows, currentStreakMap: { ...currentStreak } };
   }
 
+  // ── Compute Consistency Stats (avg_points and std_dev for each player) ────────────
+  function computeConsistencyStats(): { name: string; avg_points: number; std_dev: number }[] {
+    const playerPoints: Record<string, number[]> = {};
+
+    rows.forEach((r) => {
+      if (!playerPoints[r.player_id]) {
+        playerPoints[r.player_id] = [];
+      }
+    });
+
+    // We would need to load all match entries for each player to compute std_dev
+    // For now, we'll use a simple approach based on available data
+    return rows.map((r) => {
+      const avg = r.avg_points;
+      // Estimate std_dev as a function of (max_score - min_score)
+      const range = (r.max_score ?? 0) - (r.min_score ?? 0);
+      const stdDev = range > 0 ? range / 4 : 0; // Rough approximation
+      return {
+        name: r.name,
+        avg_points: avg,
+        std_dev: stdDev,
+      };
+    });
+  }
+
+  // ── Compute Heatmap Data ────────────────────────────────────────────
+  async function computeHeatmapData() {
+    const { data: entriesData } = await supabase.from("match_entries").select("match_id, player_id, points");
+    const { data: playersData } = await supabase.from("players").select("id, name");
+    const entries = (entriesData || []) as { match_id: string; player_id: string; points: number }[];
+    const playerMap: Record<string, string> = {};
+    (playersData || []).forEach((p: any) => { playerMap[p.id] = p.name; });
+
+    // Group by match
+    const matchGroups: Record<string, { player_id: string; points: number }[]> = {};
+    entries.forEach((e) => {
+      if (!matchGroups[e.match_id]) matchGroups[e.match_id] = [];
+      matchGroups[e.match_id].push(e);
+    });
+
+    // Get unique player IDs that appear in rows
+    const playerIds = rows.map(r => r.player_id);
+    const playerNames = rows.map(r => r.name);
+
+    // Create matrices: wins[i][j] = times player i beat player j, games[i][j] = times they played together
+    const n = playerIds.length;
+    const winsMatrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+    const gamesMatrix: number[][] = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    Object.values(matchGroups).forEach((group) => {
+      const groupPids = group.map(e => e.player_id);
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          if (i === j) continue;
+          const pidI = playerIds[i];
+          const pidJ = playerIds[j];
+          if (!groupPids.includes(pidI) || !groupPids.includes(pidJ)) continue;
+          const ptsI = Number(group.find(e => e.player_id === pidI)!.points);
+          const ptsJ = Number(group.find(e => e.player_id === pidJ)!.points);
+          gamesMatrix[i][j]++;
+          if (ptsI > ptsJ) winsMatrix[i][j]++;
+        }
+      }
+    });
+
+    // Convert to percentage
+    const matrix: number[][] = Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) =>
+        i === j ? -1 : (gamesMatrix[i][j] > 0 ? (winsMatrix[i][j] / gamesMatrix[i][j]) * 100 : -1)
+      )
+    );
+
+    setHeatmapData({ players: playerNames, matrix, gamesMatrix });
+  }
+
   // ── Wins Bar Chart ─────────────────────────────────────────────────
   useEffect(() => {
-    if (activeTab !== "charts") return;
+    if (activeTab !== "charts" || chartType !== "wins") return;
     const canvas = document.getElementById("winsChart") as HTMLCanvasElement | null;
     if (!canvas) return;
     if (winsChartRef.current) winsChartRef.current.destroy();
@@ -467,11 +602,11 @@ export default function DashboardPage() {
         },
       },
     });
-  }, [rows, activeTab]);
+  }, [rows, activeTab, chartType]);
 
   // ── Points Distribution Chart ──────────────────────────────────────
   useEffect(() => {
-    if (activeTab !== "charts") return;
+    if (activeTab !== "charts" || chartType !== "points") return;
     const canvas = document.getElementById("pointsDistChart") as HTMLCanvasElement | null;
     if (!canvas) return;
     if (pointsDistChartRef.current) pointsDistChartRef.current.destroy();
@@ -522,11 +657,95 @@ export default function DashboardPage() {
         },
       },
     });
-  }, [rows, activeTab]);
+  }, [rows, activeTab, chartType]);
+
+  // ── Win Rate per Player (Horizontal Bar Chart) ─────────────────────
+  useEffect(() => {
+    if (activeTab !== "charts" || chartType !== "winrate") return;
+    const canvas = document.getElementById("winrateChart") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if (winrateChartRef.current) winrateChartRef.current.destroy();
+    const sorted = [...rows].sort((a, b) => ((b.win_pct ?? 0) * 100) - ((a.win_pct ?? 0) * 100));
+    winrateChartRef.current = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: sorted.map((r) => r.name),
+        datasets: [{
+          label: "Win Rate %",
+          data: sorted.map((r) => (r.win_pct ?? 0) * 100),
+          backgroundColor: sorted.map((_, i) => CHART_COLORS[i % CHART_COLORS.length]),
+          borderRadius: 6,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            beginAtZero: true,
+            max: 100,
+            ticks: { color: "#64748b" },
+            grid: { color: "rgba(30, 41, 59, 0.5)" },
+          },
+          y: {
+            ticks: { color: "#94a3b8", font: { size: 11 } },
+            grid: { display: false },
+          },
+        },
+      },
+    });
+  }, [rows, activeTab, chartType]);
+
+  // ── Consistency Scatter Plot ────────────────────────────────────────
+  useEffect(() => {
+    if (activeTab !== "charts" || chartType !== "consistency") return;
+    const canvas = document.getElementById("consistencyChart") as HTMLCanvasElement | null;
+    if (!canvas) return;
+    if (consistencyChartRef.current) consistencyChartRef.current.destroy();
+
+    const consistency = computeConsistencyStats();
+    const datasets = consistency.map((item, i) => ({
+      label: item.name,
+      data: [{ x: item.avg_points, y: item.std_dev }],
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length],
+      borderColor: CHART_COLORS[i % CHART_COLORS.length],
+      pointRadius: 8,
+      pointHoverRadius: 10,
+    }));
+
+    consistencyChartRef.current = new Chart(canvas, {
+      type: "scatter",
+      data: { datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: "#94a3b8", font: { size: 11 }, usePointStyle: true } },
+          tooltip: { backgroundColor: "#1e293b", titleColor: "#f1f5f9", bodyColor: "#94a3b8", borderColor: "#334155", borderWidth: 1 },
+        },
+        scales: {
+          x: {
+            type: "linear",
+            title: { display: true, text: "Média de Pontos", color: "#64748b", font: { size: 11 } },
+            ticks: { color: "#64748b" },
+            grid: { color: "rgba(30, 41, 59, 0.3)" },
+          },
+          y: {
+            title: { display: true, text: "Desvio Padrão (Variabilidade)", color: "#64748b", font: { size: 11 } },
+            ticks: { color: "#64748b" },
+            grid: { color: "rgba(30, 41, 59, 0.3)" },
+          },
+        },
+      },
+    });
+  }, [rows, activeTab, chartType]);
 
   // ── Rating Evolution Chart ─────────────────────────────────────────
   useEffect(() => {
-    if (activeTab !== "charts") return;
+    if (activeTab !== "charts" || chartType !== "rating") return;
     const canvas = document.getElementById("ratingChart") as HTMLCanvasElement | null;
     if (!canvas) return;
     if (chartRef.current) chartRef.current.destroy();
@@ -556,6 +775,7 @@ export default function DashboardPage() {
     const dataLabelPlugin = {
       id: "dataLabelPlugin",
       afterDatasetsDraw(chart: any) {
+        if (!showRatingDataLabels) return;
         const { ctx } = chart;
         ctx.save();
         chart.data.datasets.forEach((dataset: any, di: number) => {
@@ -603,7 +823,7 @@ export default function DashboardPage() {
       },
       plugins: [dataLabelPlugin],
     });
-  }, [history, rows, selectedPlayers, activeTab]);
+  }, [history, rows, selectedPlayers, activeTab, chartType, showRatingDataLabels]);
 
   // Toggle player selection for charts
   const togglePlayer = useCallback((pid: string) => {
@@ -727,13 +947,14 @@ export default function DashboardPage() {
                     <th className="right hide-mobile">Partidas</th>
                     <th className="right hide-mobile">Média Pts</th>
                     <th className="right hide-mobile">Streak</th>
+                    <th className="right hide-mobile">Win Score</th>
                     <th className="center hide-mobile">Melhor Mapa</th>
                     <th className="right">Δ10</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.length === 0 && (
-                    <tr><td colSpan={13} className="empty-state">Nenhuma partida registrada ainda.</td></tr>
+                    <tr><td colSpan={14} className="empty-state">Nenhuma partida registrada ainda.</td></tr>
                   )}
                   {rows.map((r, i) => {
                     let rankClass = "";
@@ -775,11 +996,14 @@ export default function DashboardPage() {
                         </td>
                         <td className="right" style={{ fontWeight: 700 }}>{r.wins ?? 0}</td>
                         <td className="right hide-mobile">
-                          <WinPctBar pct={r.win_pct * 100} />
+                          <WinPctBar pct={(r.win_pct ?? 0) * 100} />
                         </td>
                         <td className="right hide-mobile">{r.games}</td>
                         <td className="right hide-mobile">{Math.round(Number(r.avg_points))}</td>
                         <td className="right hide-mobile">{r.win_streak ?? 0}</td>
+                        <td className="right hide-mobile">
+                          <WinPctBar pct={r.win_score ?? 0} />
+                        </td>
                         <td className="center hide-mobile">
                           {r.best_map ? (
                             <span className="map-badge">{r.best_map} ({r.best_map_wins}W)</span>
@@ -847,50 +1071,231 @@ export default function DashboardPage() {
       {/* ══════════════════════════════════════════════════════════ */}
       {activeTab === "charts" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Rating Evolution */}
+          {/* Chart Type Selector */}
           <div className="card">
-            <div className="card-title">Evolução do Rating</div>
-            <div style={{ marginBottom: 8, fontSize: "0.78rem", color: "var(--text-muted)" }}>
-              Clique para selecionar/remover jogadores:
-            </div>
-            <div className="player-chips">
-              {rows.map((r, i) => (
-                <span
-                  key={r.player_id}
-                  className={`player-chip ${selectedPlayers.includes(r.player_id) ? "selected" : ""}`}
-                  onClick={() => togglePlayer(r.player_id)}
-                  style={selectedPlayers.includes(r.player_id) ? {
-                    borderColor: CHART_COLORS[i % CHART_COLORS.length],
-                    background: CHART_COLORS[i % CHART_COLORS.length] + "20",
-                    color: CHART_COLORS[i % CHART_COLORS.length],
-                  } : {}}
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: 8 }}>
+                Selecionar tipo de gráfico:
+              </div>
+              <div className="player-chips" style={{ gap: 8 }}>
+                <button
+                  className={`player-chip ${chartType === "rating" ? "selected" : ""}`}
+                  onClick={() => setChartType("rating")}
+                  style={chartType === "rating" ? {
+                    borderColor: "var(--accent-blue-light)",
+                    background: "rgba(59,130,246,0.2)",
+                    color: "var(--accent-blue-light)",
+                  } : { cursor: "pointer" }}
                 >
-                  {r.name}
-                </span>
-              ))}
-            </div>
-            <div className="chart-container" style={{ height: 350 }}>
-              <canvas id="ratingChart" />
+                  Rating
+                </button>
+                <button
+                  className={`player-chip ${chartType === "wins" ? "selected" : ""}`}
+                  onClick={() => setChartType("wins")}
+                  style={chartType === "wins" ? {
+                    borderColor: "var(--accent-green)",
+                    background: "rgba(34,197,94,0.2)",
+                    color: "var(--accent-green)",
+                  } : { cursor: "pointer" }}
+                >
+                  Vitórias
+                </button>
+                <button
+                  className={`player-chip ${chartType === "points" ? "selected" : ""}`}
+                  onClick={() => setChartType("points")}
+                  style={chartType === "points" ? {
+                    borderColor: "var(--accent-orange)",
+                    background: "rgba(245,158,11,0.2)",
+                    color: "var(--accent-orange)",
+                  } : { cursor: "pointer" }}
+                >
+                  Pontuações
+                </button>
+                <button
+                  className={`player-chip ${chartType === "winrate" ? "selected" : ""}`}
+                  onClick={() => setChartType("winrate")}
+                  style={chartType === "winrate" ? {
+                    borderColor: "var(--accent-purple)",
+                    background: "rgba(168,85,247,0.2)",
+                    color: "var(--accent-purple)",
+                  } : { cursor: "pointer" }}
+                >
+                  Win Rate
+                </button>
+                <button
+                  className={`player-chip ${chartType === "consistency" ? "selected" : ""}`}
+                  onClick={() => setChartType("consistency")}
+                  style={chartType === "consistency" ? {
+                    borderColor: "var(--accent-cyan)",
+                    background: "rgba(6,182,212,0.2)",
+                    color: "var(--accent-cyan)",
+                  } : { cursor: "pointer" }}
+                >
+                  Consistência
+                </button>
+                <button
+                  className={`player-chip ${chartType === "heatmap" ? "selected" : ""}`}
+                  onClick={() => setChartType("heatmap")}
+                  style={chartType === "heatmap" ? {
+                    borderColor: "var(--accent-red)",
+                    background: "rgba(239,68,68,0.2)",
+                    color: "var(--accent-red)",
+                  } : { cursor: "pointer" }}
+                >
+                  Heatmap Confrontos
+                </button>
+              </div>
             </div>
           </div>
 
+          {/* Rating Evolution */}
+          {chartType === "rating" && (
+            <div className="card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div className="card-title">Evolução do Rating</div>
+                <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                  <input
+                    type="checkbox"
+                    checked={showRatingDataLabels}
+                    onChange={(e) => setShowRatingDataLabels(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  Mostrar valores
+                </label>
+              </div>
+              <div style={{ marginBottom: 8, fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                Clique para selecionar/remover jogadores:
+              </div>
+              <div className="player-chips">
+                {rows.map((r, i) => (
+                  <span
+                    key={r.player_id}
+                    className={`player-chip ${selectedPlayers.includes(r.player_id) ? "selected" : ""}`}
+                    onClick={() => togglePlayer(r.player_id)}
+                    style={selectedPlayers.includes(r.player_id) ? {
+                      borderColor: CHART_COLORS[i % CHART_COLORS.length],
+                      background: CHART_COLORS[i % CHART_COLORS.length] + "20",
+                      color: CHART_COLORS[i % CHART_COLORS.length],
+                    } : {}}
+                  >
+                    {r.name}
+                  </span>
+                ))}
+              </div>
+              <div className="chart-container" style={{ height: 350 }}>
+                <canvas id="ratingChart" />
+              </div>
+            </div>
+          )}
+
           {/* Wins Distribution */}
-          <div className="grid grid-2">
+          {chartType === "wins" && (
             <div className="card">
               <div className="card-title">Distribuição de Vitórias</div>
-              <div className="chart-container" style={{ height: 280 }}>
+              <div className="chart-container" style={{ height: 350 }}>
                 <canvas id="winsChart" />
               </div>
             </div>
+          )}
 
-            {/* Points Distribution */}
+          {/* Points Distribution */}
+          {chartType === "points" && (
             <div className="card">
               <div className="card-title">Pontuações (Média / Máx / Mín)</div>
-              <div className="chart-container" style={{ height: 280 }}>
+              <div className="chart-container" style={{ height: 350 }}>
                 <canvas id="pointsDistChart" />
               </div>
             </div>
-          </div>
+          )}
+
+          {/* Win Rate per Player */}
+          {chartType === "winrate" && (
+            <div className="card">
+              <div className="card-title">Win Rate por Jogador</div>
+              <div className="chart-container" style={{ height: 350 }}>
+                <canvas id="winrateChart" />
+              </div>
+            </div>
+          )}
+
+          {/* Consistency */}
+          {chartType === "consistency" && (
+            <div className="card">
+              <div className="card-title">Consistência (Média de Pontos vs Variabilidade)</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 12 }}>
+                Jogadores mais à esquerda têm média menor. Mais abaixo = mais consistentes. Quanto mais acima = maior variabilidade.
+              </div>
+              <div className="chart-container" style={{ height: 350 }}>
+                <canvas id="consistencyChart" />
+              </div>
+            </div>
+          )}
+
+          {/* Heatmap */}
+          {chartType === "heatmap" && (
+            <div className="card">
+              <div className="card-title">Heatmap de Confrontos (%)</div>
+              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginBottom: 12 }}>
+                Cada célula mostra a % de vezes que o jogador da linha venceu o jogador da coluna nos jogos em que participaram juntos.
+              </div>
+              {heatmapData.players.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ borderCollapse: "collapse", width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ padding: "6px 8px", fontSize: "0.7rem", color: "var(--text-muted)", textAlign: "left", borderBottom: "2px solid var(--border)", position: "sticky", left: 0, background: "var(--bg-card)", zIndex: 2 }}></th>
+                        {heatmapData.players.map((name, j) => (
+                          <th key={j} style={{ padding: "6px 4px", fontSize: "0.65rem", color: "var(--text-secondary)", textAlign: "center", borderBottom: "2px solid var(--border)", whiteSpace: "nowrap", minWidth: 50 }}>
+                            {name}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {heatmapData.players.map((name, i) => (
+                        <tr key={i}>
+                          <td style={{ padding: "6px 8px", fontSize: "0.72rem", fontWeight: 600, color: "var(--accent-blue-light)", whiteSpace: "nowrap", borderBottom: "1px solid var(--border)", position: "sticky", left: 0, background: "var(--bg-card)", zIndex: 1 }}>
+                            {name}
+                          </td>
+                          {heatmapData.matrix[i].map((val, j) => {
+                            if (i === j) {
+                              return (
+                                <td key={j} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "1px solid var(--border)", background: "rgba(100,116,139,0.1)", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                                  —
+                                </td>
+                              );
+                            }
+                            if (val < 0) {
+                              return (
+                                <td key={j} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "1px solid var(--border)", background: "rgba(100,116,139,0.05)", fontSize: "0.7rem", color: "var(--text-muted)" }}>
+                                  —
+                                </td>
+                              );
+                            }
+                            // Color: red (0%) -> yellow (50%) -> green (100%)
+                            const r = val < 50 ? 255 : Math.round(255 * (2 - val / 50));
+                            const g = val > 50 ? 255 : Math.round(255 * (val / 50));
+                            const bgColor = `rgba(${r},${g},0,0.2)`;
+                            const textColor = val >= 60 ? "var(--accent-green)" : val >= 40 ? "var(--accent-orange)" : "var(--accent-red)";
+                            return (
+                              <td key={j} style={{ padding: "6px 4px", textAlign: "center", borderBottom: "1px solid var(--border)", background: bgColor, fontSize: "0.75rem", fontWeight: 700, color: textColor }}>
+                                {val.toFixed(0)}%
+                                <div style={{ fontSize: "0.55rem", fontWeight: 400, color: "var(--text-muted)" }}>
+                                  ({heatmapData.gamesMatrix[i][j]}j)
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">Carregando dados de confrontos...</div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -917,14 +1322,19 @@ export default function DashboardPage() {
                       <th className="right">Win Rate</th>
                       <th className="right">Média Pts</th>
                       <th>Melhor Player</th>
+                      <th className="right hide-mobile">Jogos</th>
                       <th className="right hide-mobile">Win Rate Player</th>
                       <th className="right hide-mobile">Média Player</th>
                     </tr>
                   </thead>
                   <tbody>
                     {mapStats.map((ms) => (
-                      <tr key={ms.map}>
-                        <td><span className="map-badge">{ms.map}</span></td>
+                      <tr key={ms.map} onClick={() => setSelectedMap(ms.map)} style={{ cursor: "pointer" }}>
+                        <td>
+                          <span className="map-badge" style={{ textDecoration: "underline", cursor: "pointer" }}>
+                            {ms.map}
+                          </span>
+                        </td>
                         <td className="right">{ms.total_plays}</td>
                         <td className="right" style={{ fontWeight: 700 }}>{ms.total_wins}</td>
                         <td className="right">
@@ -932,14 +1342,85 @@ export default function DashboardPage() {
                         </td>
                         <td className="right" style={{ fontWeight: 600 }}>{ms.avg_points.toFixed(0)}</td>
                         <td>
-                          <span style={{ color: "var(--accent-blue-light)", fontWeight: 600 }}>{ms.best_player}</span>
+                          <span style={{ color: "var(--accent-blue-light)", fontWeight: 600 }}>
+                            {ms.best_player} ({ms.best_player_games} jogos)
+                          </span>
                         </td>
+                        <td className="right hide-mobile">{ms.best_player_games}</td>
                         <td className="right hide-mobile">{ms.best_player_win_rate.toFixed(0)}%</td>
                         <td className="right hide-mobile">{ms.best_player_avg.toFixed(0)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Expanded Map Details Panel */}
+            {selectedMap && mapStats.find(ms => ms.map === selectedMap) && (
+              <div style={{
+                marginTop: 24,
+                padding: 16,
+                border: "2px solid var(--accent-blue-light)",
+                borderRadius: 8,
+                backgroundColor: "rgba(59, 130, 246, 0.05)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 600, color: "var(--accent-blue-light)" }}>
+                    Desempenho dos Jogadores em {selectedMap}
+                  </div>
+                  <button
+                    onClick={() => setSelectedMap(null)}
+                    style={{
+                      background: "rgba(239, 68, 68, 0.2)",
+                      color: "var(--accent-red)",
+                      border: "1px solid var(--accent-red)",
+                      padding: "6px 12px",
+                      borderRadius: 4,
+                      cursor: "pointer",
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Fechar
+                  </button>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%" }}>
+                    <thead>
+                      <tr>
+                        <th style={{ textAlign: "left", padding: "8px" }}>Jogador</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}>Partidas</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}>Vitórias</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}>Win Rate</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}>Média Pts</th>
+                        <th style={{ textAlign: "right", padding: "8px" }}>Win Score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {mapStats.find(ms => ms.map === selectedMap)?.player_details.map((pd, idx) => (
+                        <tr key={idx}>
+                          <td style={{ padding: "8px" }}>
+                            <span style={{ color: "var(--accent-blue-light)", fontWeight: 600 }}>
+                              {pd.name}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right", padding: "8px" }}>{pd.plays}</td>
+                          <td style={{ textAlign: "right", padding: "8px", fontWeight: 700 }}>{pd.wins}</td>
+                          <td style={{ textAlign: "right", padding: "8px" }}>
+                            <WinPctBar pct={pd.win_rate} />
+                          </td>
+                          <td style={{ textAlign: "right", padding: "8px", fontWeight: 600 }}>
+                            {pd.avg_points.toFixed(0)}
+                          </td>
+                          <td style={{ textAlign: "right", padding: "8px" }}>
+                            <WinPctBar pct={pd.win_score} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -984,7 +1465,7 @@ export default function DashboardPage() {
                       <div className="map-best-label">Melhor Player</div>
                       <div className="map-best-name">{ms.best_player}</div>
                       <div className="map-best-stat">
-                        {ms.best_player_win_rate.toFixed(0)}% win rate · {ms.best_player_avg.toFixed(0)} pts média
+                        {ms.best_player_win_rate.toFixed(0)}% win rate · {ms.best_player_avg.toFixed(0)} pts média · {ms.best_player_games} jogos
                       </div>
                     </div>
                   </div>

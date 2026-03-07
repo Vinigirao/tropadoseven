@@ -815,4 +815,133 @@ button.secondary {
   margin-bottom: 16px;
 }
 
+/* ---------- Chart Type Selector ---------- */
+.chart-type-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.chart-type-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  transition: all var(--transition);
+  user-select: none;
+}
+
+.chart-type-btn:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue-light);
+}
+
+.chart-type-btn.active {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue-light);
+}
+
+/* ---------- Map Detail Panel ---------- */
+.map-detail-panel {
+  background: var(--bg-card);
+  border: 2px solid var(--accent-purple);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-top: 12px;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.1);
+}
+
+.map-detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.map-detail-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--accent-purple);
+}
+
+.map-detail-close {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.map-detail-close:hover {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+
+/* ---------- Clickable Map Name ---------- */
+.map-name-clickable {
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.map-name-clickable:hover {
+  text-decoration: underline;
+  filter: brightness(1.2);
+}
+
+/* ---------- Probability Bar ---------- */
+.prob-bar-container {
+  display: flex;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  height: 32px;
+  width: 100%;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.prob-bar-side {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  min-width: 40px;
+  transition: width 0.5s ease;
+}
+
+/* ---------- Win Rate Bar (Player Profile) ---------- */
+.winrate-bar-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.winrate-bar-track {
+  position: relative;
+  width: 50px;
+  height: 6px;
+  background: rgba(100, 116, 139, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.winrate-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.5s ease;
+}
+
 /* ---------- Responsive helpers (desativados - layout unificado) ---------- */
