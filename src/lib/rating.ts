@@ -24,7 +24,7 @@ export function computeMatchDeltas(
   playerIds: string[],
   pointsById: Record<string, number>,
   ratingById: Record<string, number>,
-  cfg: { kFactor: number; kPerf: number; scale: number },
+  cfg: { kFactor: number; kPerf: number; scale: number; victoryBonusEnabled?: boolean },
 ) {
   // Average points across all players
   const avg =
@@ -54,5 +54,14 @@ export function computeMatchDeltas(
   playerIds.forEach((id) => {
     deltas[id] += cfg.kPerf * tanh((pointsById[id] - avg) / cfg.scale);
   });
+  // Victory bonus: award (N - 1) rating points split among winner(s)
+  if (cfg.victoryBonusEnabled) {
+    const maxPoints = Math.max(...playerIds.map((id) => pointsById[id]));
+    const winners = playerIds.filter((id) => pointsById[id] === maxPoints);
+    const bonus = (playerIds.length - 1) / winners.length;
+    winners.forEach((id) => {
+      deltas[id] += bonus;
+    });
+  }
   return deltas;
 }
