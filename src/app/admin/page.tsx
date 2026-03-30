@@ -41,6 +41,9 @@ export default function AdminPage() {
     "Roma",
     "Abu Simbel"
   ];
+  // Victory bonus toggle state
+  const [victoryBonusEnabled, setVictoryBonusEnabled] = useState(false);
+  const [victoryBonusLoading, setVictoryBonusLoading] = useState(false);
   // List of existing matches for editing
   const [matches, setMatches] = useState<any[]>([]);
   const [editingMatchId, setEditingMatchId] = useState<string | null>(null);
@@ -55,10 +58,11 @@ export default function AdminPage() {
     loadPlayers();
   }, []);
 
-  // When the admin logs in, load existing matches
+  // When the admin logs in, load existing matches and victory bonus state
   useEffect(() => {
     if (logged) {
       loadMatches();
+      loadVictoryBonus();
     }
   }, [logged]);
 
@@ -69,6 +73,39 @@ export default function AdminPage() {
       const j = await res.json();
       setMatches(j.matches || []);
     }
+  }
+
+  // Load the current victory bonus setting
+  async function loadVictoryBonus() {
+    const res = await fetch("/api/admin/toggle-victory-bonus");
+    if (res.ok) {
+      const j = await res.json();
+      setVictoryBonusEnabled(j.victory_bonus_enabled ?? false);
+    }
+  }
+
+  // Toggle the victory bonus and recalculate all ratings retroactively
+  async function toggleVictoryBonus() {
+    setVictoryBonusLoading(true);
+    setMsg("");
+    const newValue = !victoryBonusEnabled;
+    const res = await fetch("/api/admin/toggle-victory-bonus", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ enabled: newValue }),
+    });
+    if (res.ok) {
+      setVictoryBonusEnabled(newValue);
+      setMsg(
+        newValue
+          ? "Bônus de vitória ativado — ratings recalculados"
+          : "Bônus de vitória desativado — ratings recalculados",
+      );
+    } else {
+      const j = await res.json();
+      setMsg(j.error || "Erro ao alterar bônus de vitória");
+    }
+    setVictoryBonusLoading(false);
   }
 
   // Attempt an admin login by posting to the login API.  On success
@@ -287,6 +324,33 @@ export default function AdminPage() {
             <button className="primary" onClick={addPlayer}>
               Adicionar
             </button>
+          </div>
+
+          <div className="card">
+            <h3 style={{ marginTop: 0 }}>Bônus de Vitória</h3>
+            <div className="muted" style={{ marginBottom: 8 }}>
+              Quando ativado, o vencedor de cada partida recebe um bônus de rating igual a N−1
+              (número de jogadores menos 1). O cálculo é retroativo para todo o histórico.
+            </div>
+            <div className="row" style={{ alignItems: "center", gap: 12 }}>
+              <span>
+                Status:{" "}
+                <strong style={{ color: victoryBonusEnabled ? "#22c55e" : "#ef4444" }}>
+                  {victoryBonusEnabled ? "Ativado" : "Desativado"}
+                </strong>
+              </span>
+              <button
+                className={victoryBonusEnabled ? "secondary" : "primary"}
+                onClick={toggleVictoryBonus}
+                disabled={victoryBonusLoading}
+              >
+                {victoryBonusLoading
+                  ? "Recalculando..."
+                  : victoryBonusEnabled
+                  ? "Desativar bônus"
+                  : "Ativar bônus"}
+              </button>
+            </div>
           </div>
 
           <div className="card">

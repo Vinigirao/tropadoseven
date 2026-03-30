@@ -38,11 +38,12 @@ CREATE TABLE rating_params (
   id INTEGER PRIMARY KEY DEFAULT 1,
   k_factor NUMERIC NOT NULL,
   k_perf NUMERIC NOT NULL,
-  scale NUMERIC NOT NULL
+  scale NUMERIC NOT NULL,
+  victory_bonus_enabled BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-INSERT INTO rating_params (id, k_factor, k_perf, scale)
-VALUES (1, 24, 10, 20)
+INSERT INTO rating_params (id, k_factor, k_perf, scale, victory_bonus_enabled)
+VALUES (1, 24, 10, 20, FALSE)
 ON CONFLICT (id) DO NOTHING;
 
 CREATE TABLE rating_history (
@@ -64,6 +65,7 @@ DECLARE
   kFactor NUMERIC;
   kPerf NUMERIC;
   scale_param NUMERIC;
+  v_bonus_enabled BOOLEAN;
   rec_match RECORD;
   rating_by_id JSONB := '{}'::jsonb;
   deltas JSONB;
@@ -78,8 +80,14 @@ DECLARE
   perf_adj NUMERIC;
   new_rating NUMERIC;
   avg_points NUMERIC;
+  max_pts NUMERIC;
+  num_players INTEGER;
+  num_winners INTEGER;
+  victory_bonus NUMERIC;
 BEGIN
-  SELECT k_factor, k_perf, scale INTO kFactor, kPerf, scale_param FROM rating_params WHERE id = 1;
+  SELECT k_factor, k_perf, scale, victory_bonus_enabled
+    INTO kFactor, kPerf, scale_param, v_bonus_enabled
+    FROM rating_params WHERE id = 1;
   DELETE FROM rating_history WHERE match_id IS NOT NULL;
 
   FOR rec_match IN SELECT id, match_date, created_at FROM matches ORDER BY match_date, created_at LOOP
@@ -118,6 +126,18 @@ BEGIN
       perf_adj := kPerf * tanh((rec_player.points - avg_points) / scale_param);
       deltas := jsonb_set(deltas, ARRAY[rec_player.player_id::text], TO_JSONB(current_delta + perf_adj));
     END LOOP;
+    -- Victory bonus: award (N - 1) rating points to the winner(s)
+    IF v_bonus_enabled THEN
+      SELECT MAX(points), COUNT(*) INTO max_pts, num_players FROM match_entries WHERE match_id = rec_match.id;
+      SELECT COUNT(*) INTO num_winners FROM match_entries WHERE match_id = rec_match.id AND points = max_pts;
+      victory_bonus := (num_players - 1)::NUMERIC / num_winners::NUMERIC;
+      FOR rec_player IN SELECT player_id, points FROM match_entries WHERE match_id = rec_match.id LOOP
+        IF rec_player.points = max_pts THEN
+          current_delta := (deltas ->> rec_player.player_id::text)::NUMERIC;
+          deltas := jsonb_set(deltas, ARRAY[rec_player.player_id::text], TO_JSONB(current_delta + victory_bonus));
+        END IF;
+      END LOOP;
+    END IF;
     FOR rec_player IN SELECT player_id FROM match_entries WHERE match_id = rec_match.id LOOP
       new_rating := (rating_by_id ->> rec_player.player_id::text)::NUMERIC + (deltas ->> rec_player.player_id::text)::NUMERIC;
       rating_by_id := jsonb_set(rating_by_id, ARRAY[rec_player.player_id::text], TO_JSONB(new_rating));
